@@ -1,0 +1,570 @@
+================================================================================
+CreditTimeline Scraper (ctscrape) - Implementation Roadmap
+================================================================================
+
+Browser extension that scrapes credit report data from provider websites,
+normalises it to the ctspec CreditTimeline format, and sends it to a ctview
+instance for long-term storage and analysis.
+
+This file tracks the full implementation timeline. Future LLM sessions should
+read this file to understand what's been done and what comes next.
+It should represent the current status of the project and you must keep this
+document up to date at all times.
+
+Whenever you complete a task in this list you must mark it as completed with
+a x in the box. When an entire phase is completed mark the phase as completed
+in the phase heading.
+The user will move the completed tasks to todos-completed.txt (do not consume
+this document unless you require historical context on why something was done)
+
+Whenever designing or implementing features or functionality or bug fixes the
+below ADRs must be respected and complied with.
+
+================================================================================
+ARCHITECTURE DECISIONS
+================================================================================
+
+AD-001: WXT Framework with Svelte
+  - WXT (wxt.dev) as the extension build framework — Vite-based, auto-generates
+    manifest from file conventions, handles cross-browser differences
+  - Svelte 5 (runes syntax) for popup/sidepanel UI — consistent with ctview
+  - TypeScript strict mode throughout
+  - @wxt-dev/module-svelte for Svelte integration
+
+AD-002: Manifest V3 (Chrome-first)
+  - Target Chrome with Manifest V3 (MV2 is deprecated/removed)
+  - Service worker for background processing (no persistent background page)
+  - Content scripts for DOM extraction on target sites
+  - Side panel as the primary UI (persistent alongside page)
+  - Popup as quick-action entry point
+  - Firefox support planned for later via WXT's cross-browser build
+
+AD-003: Adapter Pattern for Multi-Site Support
+  - Each credit report site gets its own "adapter" module
+  - Adapters implement a common interface: detect page → extract raw data
+  - Adapters are registered in a central registry
+  - Content script loads the appropriate adapter based on URL match
+  - New sites are added by creating a new adapter — no core changes needed
+
+AD-004: ctspec as Canonical Output Format
+  - All extracted data is normalised to the ctspec CreditTimeline JSON schema
+  - Reference schema: ctspec/schemas/credittimeline-file.v1.schema.json
+  - Reference enums: ctspec/schemas/credittimeline-v1-enums.json
+  - Reference mappings: ctspec/mappings/ (crosswalks, normalisation rules)
+  - Extension ships with a copy of enum values and mapping tables for
+    offline normalisation
+
+AD-005: @ctview/sdk for API Communication
+  - Use the official @ctview/sdk TypeScript client for sending data
+  - Handles auth headers, response envelope parsing, error types
+  - Extension stores ctview connection settings (URL, API key) in
+    chrome.storage.sync so they persist across devices
+
+AD-006: Content Script Extraction, Service Worker Orchestration
+  - Content scripts run in target site context to access the DOM
+  - Content scripts extract raw data and send it to the service worker
+    via @webext-core/messaging (type-safe protocol)
+  - Service worker handles: normalisation, validation, storage, API calls
+  - Separation keeps content scripts lightweight and focused on extraction
+
+AD-007: Shadow DOM for Injected UI
+  - Any UI injected into target sites (scrape buttons, status indicators)
+    uses WXT's createShadowRootUi for CSS isolation from the host page
+  - Prevents style conflicts with credit report site CSS
+
+AD-008: Local Storage Strategy
+  - chrome.storage.sync: User settings (ctview URL, API key, preferences)
+  - chrome.storage.local: Scraped data queue, extraction cache, adapter state
+  - chrome.storage.session: Temporary scrape-in-progress state
+  - WXT's typed storage wrappers (wxt/storage) for all access
+
+AD-009: Provenance & Artifact Tracking
+  - Every scrape produces a RawArtifact entry with:
+    - SHA-256 hash of the original HTML
+    - Timestamp of extraction
+    - URL of the source page
+    - Adapter version used
+  - acquisition_method is always "html_scrape" for browser extension data
+  - source_wrapper records the site name (e.g., "CheckMyFile")
+
+AD-010: Validation Before Send
+  - Extracted data is validated against ctspec JSON schema before sending
+  - Validation errors are displayed to the user in the UI with clear
+    descriptions of what's wrong
+  - User can review and optionally edit/correct data before sending
+  - Invalid data is never silently sent to ctview
+
+================================================================================
+PHASE 0: PROJECT SCAFFOLDING & FOUNDATION
+================================================================================
+
+- [x] Initialise git repository
+- [x] Create package.json with WXT, Svelte 5, TypeScript, Vitest dependencies
+- [x] Create wxt.config.ts with Svelte module, Chrome target, permissions
+- [x] Create tsconfig.json (strict mode)
+- [x] Create vitest.config.ts with WXT testing plugin
+- [x] Create .gitignore (node_modules, .output, dist, .wxt)
+- [x] Create .prettierrc and eslint.config.js (consistent with ctview style)
+- [x] Create CLAUDE.md with project instructions and conventions
+- [x] Create stub entrypoints:
+    - [x] src/entrypoints/background.ts (service worker — event listeners only)
+    - [x] src/entrypoints/popup/ (index.html + App.svelte + main.ts)
+    - [x] src/entrypoints/content.ts (content script — detection stub)
+- [x] Create type definitions:
+    - [x] src/adapters/types.ts (SiteAdapter interface, RawExtractedData)
+    - [x] src/normalizer/types.ts (NormalisationResult, NormalisationError)
+    - [x] src/types/index.ts (shared types, re-exports)
+- [x] Create messaging protocol:
+    - [x] src/utils/messaging.ts (@webext-core/messaging ProtocolMap)
+- [x] Create storage schema:
+    - [x] src/utils/storage.ts (typed WXT storage items)
+- [x] Create public/icon/.gitkeep (placeholder for extension icons)
+- [x] Verify: extension builds with `pnpm build` and loads in Chrome
+- [ ] Verify: `pnpm dev` starts WXT dev server with HMR
+
+================================================================================
+PHASE 1: CORE ADAPTER FRAMEWORK
+================================================================================
+
+Build the adapter pattern, messaging backbone, and extraction pipeline that
+all site-specific adapters will use.
+
+- [x] Define SiteAdapter interface in full:
+    - [x] id: string — unique adapter identifier (e.g., "checkmyfile")
+    - [x] name: string — human-readable name (e.g., "CheckMyFile")
+    - [x] version: string — adapter version (semver)
+    - [x] matchPatterns: string[] — URL patterns for content script registration
+    - [x] detect(document: Document): boolean — is this a scrapeable report page?
+    - [x] getPageInfo(document: Document): PageInfo — page metadata (subject name,
+          report date, provider info) before full extraction
+    - [x] extract(document: Document): Promise<RawExtractedData> — full extraction
+    - [x] getSupportedSections(): string[] — what data domains this adapter covers
+- [x] Define RawExtractedData types:
+    - [x] RawExtractedData: top-level container with metadata + sections
+    - [x] RawSection: per-domain extracted data (addresses, tradelines, etc.)
+    - [x] RawField: individual field with value, confidence, source element ref
+    - [x] ExtractionMetadata: timing, adapter version, page URL, HTML hash
+- [x] Create adapter registry (src/adapters/registry.ts):
+    - [x] Central Map<string, SiteAdapter> of registered adapters
+    - [x] getAdapterForUrl(url: string): SiteAdapter | null
+    - [x] getAllAdapters(): SiteAdapter[]
+    - [x] Dynamic import pattern so unused adapters don't bloat content scripts
+- [x] Implement messaging protocol (expand src/utils/messaging.ts):
+    - [x] PAGE_DETECTED: content script → background (adapter detected a page)
+    - [x] EXTRACT_REQUEST: background → content script (trigger extraction)
+    - [x] EXTRACT_RESULT: content script → background (extraction complete)
+    - [x] EXTRACT_ERROR: content script → background (extraction failed)
+    - [x] NORMALIZE_COMPLETE: background → popup/sidepanel (data ready)
+    - [x] SEND_TO_CTVIEW: popup/sidepanel → background (user approved send)
+    - [x] SEND_RESULT: background → popup/sidepanel (send success/failure)
+    - [x] GET_STATUS: popup/sidepanel → background (poll current state)
+- [x] Implement extraction orchestrator (src/extraction/orchestrator.ts):
+    - [x] Coordinates the extract → normalise → validate → queue pipeline
+    - [x] Manages extraction state (idle, detecting, extracting, normalising,
+          ready, sending, complete, error)
+    - [x] Handles retries and error recovery
+- [x] Implement HTML artifact capture:
+    - [x] Capture relevant DOM sections as HTML strings
+    - [x] Compute SHA-256 hash for provenance
+    - [x] Store temporarily in chrome.storage.local
+- [x] Unit tests for adapter registry and orchestrator
+- [x] Unit tests for messaging protocol types
+
+================================================================================
+PHASE 2: CHECKMYFILE ADAPTER
+================================================================================
+
+Build the first site-specific adapter targeting checkmyfile.com. CheckMyFile
+is uniquely valuable because it shows data from all three UK CRAs (Equifax,
+TransUnion, Experian) in a single view. It is critical that when data is ingested from this adapter
+that it is associated with the correct CRA. This is clearly visible in the web page/DOM.
+
+IMPORTANT: This phase requires research on the actual CheckMyFile DOM structure.
+Use the Claude Code Chrome MCP server. The user can login to checkmyfile as part of the session. The adapter will need to be built against the real
+DOM, not assumptions.
+
+- [ ] Research & document CheckMyFile page structure:
+    - [ ] Identify report page URL patterns (e.g., /report/*, /dashboard/*)
+    - [ ] Map the DOM structure of each report section
+    - [ ] Identify which sections contain data from which CRA
+    - [ ] Document how multi-CRA data is presented (tabs? sections? merged?)
+    - [ ] Note any dynamic loading (lazy sections, infinite scroll, AJAX calls)
+    - [ ] Capture sample HTML snapshots for test fixtures
+    - [ ] Document authentication/session requirements (is data behind a login?)
+- [ ] Implement CheckMyFile adapter (src/adapters/checkmyfile/):
+    - [ ] index.ts — adapter registration and SiteAdapter implementation
+    - [ ] detector.ts — page detection logic (URL + DOM markers)
+    - [ ] extractor.ts — main extraction orchestration
+    - [ ] sections/ — per-section extractors:
+        - [ ] personal-info.ts (name, DOB, addresses from each CRA)
+        - [ ] accounts.ts (tradelines / credit agreements)
+        - [ ] account-detail.ts (individual account deep-dive if separate page)
+        - [ ] searches.ts (credit enquiries / hard & soft pulls)
+        - [ ] public-records.ts (CCJs, bankruptcies, IVAs, DROs)
+        - [ ] electoral-roll.ts (electoral register entries)
+        - [ ] financial-associates.ts (linked persons)
+        - [ ] scores.ts (credit scores from each CRA)
+        - [ ] fraud.ts (CIFAS markers if visible)
+        - [ ] notices.ts (notices of correction)
+    - [ ] utils.ts — helper functions (date parsing, amount parsing, etc.)
+- [ ] Handle multi-CRA data separation:
+    - [ ] Identify which CRA each data point came from
+    - [ ] Create separate import batches per CRA in the output
+    - [ ] Set source_system correctly per batch (equifax/transunion/experian)
+    - [ ] Set source_wrapper to "CheckMyFile" for all batches
+- [ ] Handle CheckMyFile-specific challenges:
+    - [ ] Pagination within sections (if any)
+    - [ ] Expandable/collapsible sections (ensure data is visible before extract)
+    - [ ] Dynamic content loading (wait for AJAX if needed)
+    - [ ] Multi-page reports (if report spans multiple pages)
+    - [ ] Date format variations across CRAs shown on same page
+    - [ ] Currency/amount format variations
+- [ ] Create comprehensive test fixtures:
+    - [ ] Sample HTML fragments for each section type
+    - [ ] Edge cases: empty sections, missing data, unusual formats
+    - [ ] Multi-CRA scenarios: same tradeline from different CRAs
+- [ ] Unit tests for each section extractor
+- [ ] Integration test: full page extraction → RawExtractedData
+
+================================================================================
+PHASE 3: DATA NORMALISATION & MAPPING
+================================================================================
+
+Convert raw extracted data from any adapter into a valid ctspec CreditFile
+payload. This is the bridge between site-specific DOM extraction and the
+canonical data model.
+
+- [ ] Create normalisation engine (src/normalizer/engine.ts):
+    - [ ] Takes RawExtractedData → produces CreditFile (ctspec format)
+    - [ ] Handles ID generation (deterministic, reproducible)
+    - [ ] Sets file_id, subject_id, created_at, schema_version
+    - [ ] Creates import batches from adapter metadata
+- [ ] Implement field mapping for each domain:
+    - [ ] Subject identity (names, DOB, identifiers)
+    - [ ] Addresses (parse UK addresses, generate normalised single-line)
+    - [ ] Address associations (map roles from raw text to enum)
+    - [ ] Organisations (furnisher/searcher entities)
+    - [ ] Tradelines:
+        - [ ] Account type mapping (raw provider text → canonical enum)
+          Reference: ctspec/mappings/account-type-crosswalk-v1.csv
+        - [ ] Status mapping (raw provider text → canonical status)
+          Reference: ctspec/mappings/account-status-crosswalk-v1.csv
+        - [ ] Terms extraction and normalisation
+        - [ ] Snapshot generation (current balances, limits)
+        - [ ] Monthly metrics (payment history → time series)
+          Reference: ctspec/mappings/payment-status-crosswalk-v1.csv
+        - [ ] Event detection (defaults, delinquencies, settlements)
+        - [ ] Identifier extraction (masked account numbers)
+    - [ ] Searches (credit enquiries):
+        - [ ] Search type mapping (raw text → canonical enum)
+          Reference: ctspec/mappings/search-type-crosswalk-v1.csv
+        - [ ] Visibility classification (hard/soft/unknown)
+    - [ ] Credit scores (score values, bands, factors)
+    - [ ] Public records (CCJ amounts, dates, status)
+    - [ ] Electoral roll entries
+    - [ ] Financial associates
+    - [ ] Fraud markers (if available)
+    - [ ] Notices of correction (if available)
+- [ ] Implement money parsing:
+    - [ ] Parse £1,234.56 → 123456 (pence, integer minor units)
+    - [ ] Handle negative amounts, zero, missing values
+    - [ ] Handle currency symbols and variations
+- [ ] Implement date normalisation:
+    - [ ] Parse DD/MM/YYYY, D MMM YYYY, DD-Mon-YYYY, YYYY-MM-DD, etc.
+    - [ ] Output ISO 8601 (YYYY-MM-DD for dates, YYYY-MM for periods)
+    - [ ] Handle missing/partial dates gracefully
+- [ ] Implement canonical ID generation:
+    - [ ] Deterministic tradeline.canonical_id from account properties
+    - [ ] Stable across re-scrapes of the same account
+    - [ ] Uses: furnisher name + account type + masked account number + open date
+- [ ] Implement provenance/artifact generation:
+    - [ ] Create RawArtifact entries with SHA-256, timestamps, URLs
+    - [ ] Set acquisition_method = "html_scrape"
+    - [ ] Set source_wrapper = adapter name
+    - [ ] Include adapter version in mapping_version
+- [ ] Ship enum and mapping data with the extension:
+    - [ ] Bundle ctspec enum values for offline validation
+    - [ ] Bundle crosswalk tables for offline mapping
+    - [ ] Version these and check for updates
+- [ ] Implement validation:
+    - [ ] Validate output CreditFile against ctspec JSON schema
+    - [ ] Generate human-readable validation errors
+    - [ ] Quality warnings (low confidence, missing optional data)
+    - [ ] Referential integrity checks (source_import_id refs, FK refs)
+- [ ] Unit tests for each mapping domain
+- [ ] Unit tests for money and date parsing
+- [ ] Unit tests for canonical ID generation
+- [ ] Integration test: RawExtractedData → valid CreditFile
+- [ ] Edge case tests: empty data, partial data, malformed data
+
+================================================================================
+PHASE 4: EXTENSION UI
+================================================================================
+
+Build the Svelte 5 UI for the extension's side panel and popup. The side panel
+is the primary interface; the popup provides quick actions.
+
+- [ ] Create extension icons:
+    - [ ] Design icon set (16x16, 32x32, 48x48, 128x128 PNG)
+    - [ ] Use a distinctive design that complements the ctview brand
+- [ ] Implement popup (quick actions):
+    - [ ] Show current page status (adapter detected / not supported / extracting)
+    - [ ] "Scrape This Page" button (if adapter detected)
+    - [ ] "Open Side Panel" button
+    - [ ] Connection status indicator (ctview reachable / unreachable / not configured)
+    - [ ] Badge on extension icon showing state (idle, detected, extracting, error)
+- [ ] Implement side panel (main UI):
+    - [ ] Connection settings:
+        - [ ] ctview server URL input
+        - [ ] API key input (masked)
+        - [ ] Test connection button
+        - [ ] Connection status indicator
+        - [ ] Save to chrome.storage.sync
+    - [ ] Current page section:
+        - [ ] Detected site/adapter info
+        - [ ] Subject name and report date (from getPageInfo)
+        - [ ] "Extract Data" button with progress indicator
+    - [ ] Extraction results / data preview:
+        - [ ] Summary of extracted data (entity counts per domain)
+        - [ ] Expandable sections showing extracted data
+        - [ ] Validation status (pass/fail with details)
+        - [ ] Quality warnings (confidence levels, missing data)
+    - [ ] Send to ctview:
+        - [ ] "Send to ctview" button (enabled only when data is valid)
+        - [ ] Pre-send confirmation dialog showing what will be sent
+        - [ ] Progress indicator during send
+        - [ ] Success/failure feedback with details
+        - [ ] Link to view imported data in ctview (deep link to import)
+    - [ ] History section:
+        - [ ] List of recent scrapes (date, site, status, entity counts)
+        - [ ] Re-send failed scrapes
+        - [ ] Clear history
+    - [ ] Settings section:
+        - [ ] Default subject ID (for matching across imports)
+        - [ ] Auto-extract on page load toggle
+        - [ ] Theme (light/dark, follow system)
+- [ ] Implement action badge (extension icon):
+    - [ ] Grey: no adapter for current page
+    - [ ] Blue: adapter detected, ready to scrape
+    - [ ] Yellow: extraction in progress
+    - [ ] Green: data extracted and valid
+    - [ ] Red: error occurred
+- [ ] Create shared Svelte components:
+    - [ ] StatusBadge.svelte
+    - [ ] EntitySummary.svelte
+    - [ ] ValidationErrors.svelte
+    - [ ] SettingsForm.svelte
+    - [ ] ProgressBar.svelte
+    - [ ] Toast notifications
+- [ ] Implement responsive layout (side panel is narrow: ~350px)
+- [ ] Test UI with sample data (mock extraction results)
+
+================================================================================
+PHASE 5: CTVIEW INTEGRATION
+================================================================================
+
+Wire up the extension to communicate with a ctview instance using @ctview/sdk.
+
+- [ ] Integrate @ctview/sdk in the service worker:
+    - [ ] Instantiate CtviewClient from stored settings
+    - [ ] Re-create client when settings change
+    - [ ] Handle missing/invalid configuration gracefully
+- [ ] Implement connection testing:
+    - [ ] Ping ctview readiness endpoint (GET /api/v1/ready)
+    - [ ] Display server version and status in UI
+    - [ ] Handle CORS configuration requirements
+    - [ ] Helpful error messages for common issues:
+        - [ ] CORS not configured (suggest CORS_ALLOW_ORIGIN setting)
+        - [ ] API key required but not set
+        - [ ] Server unreachable (wrong URL, not running)
+- [ ] Implement the send flow:
+    - [ ] User clicks "Send to ctview"
+    - [ ] Service worker calls client.ingest(creditFile)
+    - [ ] Handle success: show receipt, import IDs, entity summary
+    - [ ] Handle duplicate detection: inform user, offer to force re-send
+    - [ ] Handle validation errors: display in UI, allow correction
+    - [ ] Handle rate limiting: wait and retry with backoff
+    - [ ] Handle network errors: queue for retry, inform user
+- [ ] Implement retry queue:
+    - [ ] Failed sends are queued in chrome.storage.local
+    - [ ] Automatic retry with exponential backoff
+    - [ ] Manual retry from history view
+    - [ ] Maximum retry count with escalation to user
+- [ ] Implement deep linking:
+    - [ ] After successful send, provide link to ctview import view
+    - [ ] Link format: {ctview_url}/imports/{import_id}
+- [ ] Handle CORS setup for extension:
+    - [ ] Document that ctview needs CORS_ALLOW_ORIGIN configured
+    - [ ] Consider: extension pages use chrome-extension:// origin
+    - [ ] Alternative: use host_permissions to bypass CORS for API calls
+      (content script fetch inherits page origin, but background service
+      worker fetch uses extension origin — host_permissions allows this)
+- [ ] Unit tests for SDK integration (mocked responses)
+- [ ] Integration test: full send flow with test server
+
+================================================================================
+PHASE 6: TESTING & QUALITY
+================================================================================
+
+Comprehensive testing across all layers of the extension.
+
+- [ ] Unit testing setup:
+    - [ ] Vitest with WxtVitest plugin
+    - [ ] @webext-core/fake-browser for browser API mocking
+    - [ ] Test helpers for creating mock DOM elements
+    - [ ] Test fixtures for CheckMyFile HTML samples
+- [ ] Unit tests (target: >80% coverage):
+    - [ ] Adapter framework (registry, interface compliance)
+    - [ ] CheckMyFile section extractors (each section separately)
+    - [ ] Normalisation engine (each domain mapping)
+    - [ ] Money parsing (all format variations)
+    - [ ] Date parsing (all format variations)
+    - [ ] Canonical ID generation (determinism, stability)
+    - [ ] Messaging protocol (type safety, round-trip)
+    - [ ] Storage operations (read/write/watch)
+    - [ ] Validation (valid files pass, invalid files fail with good errors)
+- [ ] Integration tests:
+    - [ ] Full pipeline: HTML fixture → extract → normalise → valid CreditFile
+    - [ ] Multiple CRA data separation (CheckMyFile-specific)
+    - [ ] Error propagation through the pipeline
+    - [ ] Storage persistence across simulated service worker restarts
+- [ ] E2E tests (Puppeteer):
+    - [ ] Extension loads in Chrome without errors
+    - [ ] Popup renders and shows correct state
+    - [ ] Side panel renders and settings can be configured
+    - [ ] Content script activates on matching URLs
+    - [ ] Full scrape flow with a local test page mimicking CheckMyFile HTML
+- [ ] Visual regression:
+    - [ ] Screenshot comparison for popup and sidepanel states
+- [ ] Performance testing:
+    - [ ] Measure extraction time for large reports
+    - [ ] Measure normalisation time
+    - [ ] Measure memory usage during extraction
+    - [ ] Ensure content script doesn't degrade target site performance
+- [ ] Security review:
+    - [ ] No sensitive data logged to console in production
+    - [ ] API key stored securely (chrome.storage.sync, not localStorage)
+    - [ ] Content script doesn't expose extracted data to page scripts
+    - [ ] No eval() or dynamic code execution
+    - [ ] CSP compliance verified
+
+================================================================================
+PHASE 7: POLISH & DISTRIBUTION
+================================================================================
+
+Prepare the extension for Chrome Web Store publication and ongoing maintenance.
+
+- [ ] Branding and assets:
+    - [ ] Final extension icon set (all sizes)
+    - [ ] Chrome Web Store screenshots (1280x800)
+    - [ ] Promotional images (440x280 small, 920x680 large)
+    - [ ] Short description (132 chars max)
+    - [ ] Full description
+- [ ] Chrome Web Store listing:
+    - [ ] Privacy policy (what data is collected, where it's sent)
+    - [ ] Permissions justification (why each permission is needed)
+    - [ ] Category selection
+    - [ ] Support URL
+- [ ] Build optimisation:
+    - [ ] Tree-shake unused code
+    - [ ] Minimise bundle size
+    - [ ] Verify no source maps in production build
+    - [ ] Audit dependencies for size and security
+- [ ] CI/CD pipeline (.github/workflows/):
+    - [ ] Lint and type-check on PR
+    - [ ] Run unit tests on PR
+    - [ ] Build extension on PR (verify it compiles)
+    - [ ] Run E2E tests on merge to main
+    - [ ] Auto-publish to Chrome Web Store on version tag
+    - [ ] Use wxt zip for store-ready archive
+- [ ] Documentation:
+    - [ ] README.md with setup, development, and usage instructions
+    - [ ] Architecture overview (adapter pattern, data flow diagram)
+    - [ ] Contributing guide (how to add a new adapter)
+    - [ ] User guide (how to install, configure, and use the extension)
+- [ ] Version management:
+    - [ ] Semantic versioning
+    - [ ] CHANGELOG.md
+    - [ ] Auto-bump version in manifest via CI
+- [ ] Error reporting:
+    - [ ] Structured error logging
+    - [ ] Optional telemetry (opt-in, anonymised)
+    - [ ] User-facing error messages with troubleshooting steps
+- [ ] First Chrome Web Store submission
+- [ ] Verify store review passes (permissions audit, privacy compliance)
+
+================================================================================
+FUTURE: ADDITIONAL ADAPTERS
+================================================================================
+
+Each adapter follows the same pattern established by the CheckMyFile adapter.
+These are listed in priority order based on UK market coverage.
+
+ClearScore (TransUnion data):
+  - [ ] Research ClearScore page structure
+  - [ ] Implement ClearScore adapter (src/adapters/clearscore/)
+  - [ ] Section extractors for ClearScore-specific layout
+  - [ ] Test fixtures and unit tests
+  - [ ] Integration test: ClearScore HTML → valid CreditFile
+
+Credit Karma (TransUnion data):
+  - [ ] Research Credit Karma UK page structure
+  - [ ] Implement Credit Karma adapter (src/adapters/creditkarma/)
+  - [ ] Section extractors for Credit Karma-specific layout
+  - [ ] Test fixtures and unit tests
+  - [ ] Integration test: Credit Karma HTML → valid CreditFile
+
+Experian Credit Expert (Experian data):
+  - [ ] Research Experian page structure
+  - [ ] Implement Experian adapter (src/adapters/experian/)
+  - [ ] Section extractors for Experian-specific layout
+  - [ ] Test fixtures and unit tests
+  - [ ] Integration test: Experian HTML → valid CreditFile
+
+MSE Credit Club (Experian data via MoneySupermarket):
+  - [ ] Research MSE Credit Club page structure
+  - [ ] Implement MSE adapter (src/adapters/mse/)
+  - [ ] Test fixtures and unit tests
+
+Generic Page Scraper:
+  - [ ] Implement user-configurable scraper for unsupported sites
+  - [ ] Allow users to define CSS selectors for each data field
+  - [ ] Template system for saving and sharing scraper configs
+  - [ ] Import/export scraper configs
+
+================================================================================
+FUTURE: ADVANCED FEATURES
+================================================================================
+
+Auto-Scrape & Scheduling:
+  - [ ] Auto-extract when a supported report page is loaded
+  - [ ] Configurable: prompt before extracting vs. silent extract
+  - [ ] Optional auto-send (with confirmation) vs. manual send
+  - [ ] Chrome alarms API for periodic check reminders
+
+Diff Detection:
+  - [ ] Compare new extraction with previous extraction for same subject
+  - [ ] Highlight changes: new accounts, closed accounts, balance movements,
+        score changes, new searches
+  - [ ] Show diff summary before sending to ctview
+
+Multi-Subject Support:
+  - [ ] Support extracting data for multiple subjects (household members)
+  - [ ] Subject selection/creation in the UI
+  - [ ] Associate extractions with correct subject
+
+Offline Queue:
+  - [ ] Queue extractions when ctview is unreachable
+  - [ ] Background sync when connection is restored
+  - [ ] Queue management UI (view, delete, retry pending sends)
+
+Data Enrichment:
+  - [ ] OCR support for image-based data (screenshot regions)
+  - [ ] Manual data entry for fields the scraper couldn't extract
+  - [ ] Correction/annotation before sending
+
+Firefox Support:
+  - [ ] Build and test with WXT's Firefox target
+  - [ ] Handle Firefox-specific API differences (sidebar vs sidepanel)
+  - [ ] Submit to Firefox Add-ons (AMO) with source ZIP
+  - [ ] CI/CD for Firefox builds
