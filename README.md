@@ -6,6 +6,7 @@ Browser extension that scrapes credit report data from provider websites, normal
 
 - Detects supported credit report pages automatically
 - Extracts structured data from multi-CRA report pages via DOM scraping
+- Imports Equifax credit reports from PDF uploads
 - Normalises raw extracted data to the ctspec CreditTimeline schema
 - Validates data against ctspec before sending
 - Sends normalised data to your ctview instance via API
@@ -16,9 +17,10 @@ Browser extension that scrapes credit report data from provider websites, normal
 
 ## Supported Sites
 
-| Site | Provider(s) | Status |
-|------|------------|--------|
-| [CheckMyFile](https://www.checkmyfile.com) | Equifax, Experian, TransUnion, Crediva | Active |
+| Source | Provider(s) | Method | Status |
+|--------|------------|--------|--------|
+| [CheckMyFile](https://www.checkmyfile.com) | Equifax, Experian, TransUnion, Crediva | HTML scrape | Active |
+| Equifax PDF | Equifax | PDF upload | Active |
 
 ## Related Projects
 

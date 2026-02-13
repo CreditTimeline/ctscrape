@@ -6,7 +6,7 @@
  */
 
 // TODO: Replace with your Grafana Cloud Faro collector URL
-export const FARO_COLLECTOR_URL = '';
+export const FARO_COLLECTOR_URL = 'https://faro-collector-prod-gb-south-1.grafana.net/collect/2832e4ab10ca79328a6bf1d7d2afa2c6';
 
 export const FARO_APP_NAME = 'ctscrape';
 
