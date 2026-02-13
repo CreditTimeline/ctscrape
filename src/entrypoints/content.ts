@@ -1,3 +1,4 @@
+import '@/adapters/checkmyfile';
 import { getAdapterForUrl } from '@/adapters/registry';
 import { captureWithHash } from '@/utils/html-capture';
 import { sendMessage, onMessage } from '@/utils/messaging';
