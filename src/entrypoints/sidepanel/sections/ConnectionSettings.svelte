@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { ConnectionSettings } from '../../../utils/storage';
+  import type { ConnectionTestResult } from '../../../lib/ctview-client';
+  import { sendMessage } from '../../../utils/messaging';
   import ExpandableSection from '../../../components/ExpandableSection.svelte';
 
   let {
@@ -13,6 +15,8 @@
   let serverUrl = $state('');
   let apiKey = $state('');
   let showKey = $state(false);
+  let testing = $state(false);
+  let testResult = $state<ConnectionTestResult | null>(null);
 
   // Sync from parent when settings change
   $effect(() => {
@@ -24,7 +28,24 @@
   let isConfigured = $derived(settings.serverUrl !== '' && settings.apiKey !== '');
 
   function handleSave() {
-    onsave({ serverUrl: serverUrl.trim(), apiKey: apiKey.trim() });
+    const trimmedUrl = serverUrl.trim().replace(/\/$/, '');
+    onsave({ serverUrl: trimmedUrl, apiKey: apiKey.trim() });
+    testResult = null;
+  }
+
+  async function handleTestConnection() {
+    testing = true;
+    testResult = null;
+    try {
+      testResult = await sendMessage('testConnection', undefined);
+    } catch (e) {
+      testResult = {
+        success: false,
+        error: e instanceof Error ? e.message : 'Unknown error',
+      };
+    } finally {
+      testing = false;
+    }
   }
 </script>
 
@@ -62,12 +83,28 @@
       </label>
 
       <div class="actions">
+        <button
+          class="btn btn-secondary"
+          disabled={!isConfigured || testing}
+          onclick={handleTestConnection}
+        >
+          {testing ? 'Testing...' : 'Test Connection'}
+        </button>
         <button class="btn btn-primary" disabled={!hasChanges} onclick={handleSave}>
           Save
         </button>
       </div>
 
-      {#if isConfigured}
+      {#if testResult}
+        {#if testResult.success}
+          <p class="status connected">Server ready</p>
+        {:else}
+          <p class="status error">{testResult.error}</p>
+          {#if testResult.suggestion}
+            <p class="status suggestion">{testResult.suggestion}</p>
+          {/if}
+        {/if}
+      {:else if isConfigured}
         <p class="status connected">Connected to {settings.serverUrl}</p>
       {:else}
         <p class="status not-connected">Not configured</p>
@@ -128,6 +165,7 @@
   .actions {
     display: flex;
     justify-content: flex-end;
+    gap: var(--ct-space-2);
   }
 
   .btn {
@@ -152,6 +190,12 @@
     color: var(--ct-color-text-inverse);
   }
 
+  .btn-secondary {
+    background: var(--ct-color-bg-subtle);
+    color: var(--ct-color-text);
+    border: 1px solid var(--ct-color-border);
+  }
+
   .status {
     font-size: var(--ct-font-size-xs);
     padding: var(--ct-space-1) 0;
@@ -163,5 +207,14 @@
 
   .not-connected {
     color: var(--ct-color-text-muted);
+  }
+
+  .error {
+    color: var(--ct-color-error);
+  }
+
+  .suggestion {
+    color: var(--ct-color-text-muted);
+    font-style: italic;
   }
 </style>

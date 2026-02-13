@@ -3,13 +3,20 @@ import { getAdapterForUrl } from '@/adapters/registry';
 import { captureWithHash } from '@/utils/html-capture';
 import { sendMessage, onMessage } from '@/utils/messaging';
 import type { SiteAdapter } from '@/adapters/types';
+import { createLogger } from '@/lib/logger';
+import type { LogEntry } from '@/lib/logger';
 
 export default defineContentScript({
   matches: ['*://*.checkmyfile.com/*'],
   runAt: 'document_idle',
 
   main(ctx) {
-    console.log('[ctscrape] content script loaded on', window.location.href);
+    // Content script logger: flushes entries to background via logEntries message
+    const logger = createLogger('content', async (entries: LogEntry[]) => {
+      await sendMessage('logEntries', { entries });
+    });
+
+    logger.info('content script loaded', { category: 'lifecycle', data: { url: window.location.href } });
 
     let currentAdapter: SiteAdapter | null = null;
 
@@ -19,15 +26,15 @@ export default defineContentScript({
         if (currentAdapter) {
           // Was previously detected, now left
           currentAdapter = null;
-          sendMessage('pageLeft', undefined).catch(console.error);
+          sendMessage('pageLeft', undefined).catch((err) => logger.error('pageLeft message failed', { category: 'lifecycle', error: err }));
         }
         return;
       }
 
       currentAdapter = adapter;
       const pageInfo = adapter.getPageInfo(document);
-      console.log('[ctscrape] page detected:', adapter.name, pageInfo);
-      sendMessage('pageDetected', { pageInfo }).catch(console.error);
+      logger.info('page detected', { category: 'adapter', data: { adapter: adapter.name, pageInfo } });
+      sendMessage('pageDetected', { pageInfo }).catch((err) => logger.error('pageDetected message failed', { category: 'lifecycle', error: err }));
     }
 
     // Detect on initial load
@@ -38,7 +45,7 @@ export default defineContentScript({
       if (!currentAdapter) {
         sendMessage('extractError', {
           error: 'No adapter active for this page',
-        }).catch(console.error);
+        }).catch((err) => logger.error('extractError message failed', { category: 'extraction', error: err }));
         return;
       }
 
@@ -52,13 +59,14 @@ export default defineContentScript({
         // Set the HTML hash on the extraction metadata
         rawData.metadata.htmlHash = hash;
 
-        sendMessage('extractResult', { rawData }).catch(console.error);
+        sendMessage('extractResult', { rawData }).catch((err) => logger.error('extractResult message failed', { category: 'extraction', error: err }));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        logger.error('extraction failed', { category: 'extraction', error: err });
         sendMessage('extractError', {
           error: message,
           details: err instanceof Error ? err.stack : undefined,
-        }).catch(console.error);
+        }).catch((e) => logger.error('extractError message failed', { category: 'extraction', error: e }));
       }
     });
 
@@ -69,7 +77,8 @@ export default defineContentScript({
 
     // Clean up on invalidation (extension update, disable, etc.)
     ctx.onInvalidated(() => {
-      console.log('[ctscrape] content script invalidated');
+      logger.info('content script invalidated', { category: 'lifecycle' });
+      logger.flush().catch(() => {});
       currentAdapter = null;
     });
   },

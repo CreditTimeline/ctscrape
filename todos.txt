@@ -96,202 +96,6 @@ AD-010: Validation Before Send
 
 
 ================================================================================
-PHASE 4: EXTENSION UI [COMPLETED]
-================================================================================
-
-Build the Svelte 5 UI for the extension's side panel and popup. The side panel
-is the primary interface; the popup provides quick actions.
-
-- [x] Create extension icons:
-    - [x] Design icon set (16x16, 32x32, 48x48, 128x128 PNG)
-    - [x] Use a distinctive design that complements the ctview brand
-- [x] Implement popup (quick actions):
-    - [x] Show current page status (adapter detected / not supported / extracting)
-    - [x] "Scrape This Page" button (if adapter detected)
-    - [x] "Open Side Panel" button
-    - [x] Connection status indicator (ctview reachable / unreachable / not configured)
-    - [x] Badge on extension icon showing state (idle, detected, extracting, error)
-- [x] Implement side panel (main UI):
-    - [x] Connection settings:
-        - [x] ctview server URL input
-        - [x] API key input (masked)
-        - [x] Test connection button
-        - [x] Connection status indicator
-        - [x] Save to chrome.storage.sync
-    - [x] Current page section:
-        - [x] Detected site/adapter info
-        - [x] Subject name and report date (from getPageInfo)
-        - [x] "Extract Data" button with progress indicator
-    - [x] Extraction results / data preview:
-        - [x] Summary of extracted data (entity counts per domain)
-        - [x] Expandable sections showing extracted data
-        - [x] Validation status (pass/fail with details)
-        - [x] Quality warnings (confidence levels, missing data)
-    - [x] Send to ctview:
-        - [x] "Send to ctview" button (enabled only when data is valid)
-        - [x] Pre-send confirmation dialog showing what will be sent
-        - [x] Progress indicator during send
-        - [x] Success/failure feedback with details
-        - [x] Link to view imported data in ctview (deep link to import)
-    - [x] History section:
-        - [x] List of recent scrapes (date, site, status, entity counts)
-        - [x] Re-send failed scrapes
-        - [x] Clear history
-    - [x] Settings section:
-        - [x] Default subject ID (for matching across imports)
-        - [x] Auto-extract on page load toggle
-        - [x] Theme (light/dark, follow system)
-- [x] Implement action badge (extension icon):
-    - [x] Grey: no adapter for current page
-    - [x] Blue: adapter detected, ready to scrape
-    - [x] Yellow: extraction in progress
-    - [x] Green: data extracted and valid
-    - [x] Red: error occurred
-- [x] Create shared Svelte components:
-    - [x] StatusBadge.svelte
-    - [x] EntitySummary.svelte
-    - [x] ValidationErrors.svelte
-    - [x] SettingsForm.svelte
-    - [x] ProgressBar.svelte
-    - [x] Toast notifications
-- [x] Implement responsive layout (side panel is narrow: ~350px)
-- [x] Test UI with sample data (mock extraction results)
-
-================================================================================
-PHASE 5: CTVIEW INTEGRATION
-================================================================================
-
-Wire up the extension to communicate with a ctview instance using @ctview/sdk.
-
-- [ ] Integrate @ctview/sdk in the service worker:
-    - [ ] Instantiate CtviewClient from stored settings
-    - [ ] Re-create client when settings change
-    - [ ] Handle missing/invalid configuration gracefully
-- [ ] Implement connection testing:
-    - [ ] Ping ctview readiness endpoint (GET /api/v1/ready)
-    - [ ] Display server version and status in UI
-    - [ ] Handle CORS configuration requirements
-    - [ ] Helpful error messages for common issues:
-        - [ ] CORS not configured (suggest CORS_ALLOW_ORIGIN setting)
-        - [ ] API key required but not set
-        - [ ] Server unreachable (wrong URL, not running)
-- [ ] Implement the send flow:
-    - [ ] User clicks "Send to ctview"
-    - [ ] Service worker calls client.ingest(creditFile)
-    - [ ] Handle success: show receipt, import IDs, entity summary
-    - [ ] Handle duplicate detection: inform user, offer to force re-send
-    - [ ] Handle validation errors: display in UI, allow correction
-    - [ ] Handle rate limiting: wait and retry with backoff
-    - [ ] Handle network errors: queue for retry, inform user
-- [ ] Implement retry queue:
-    - [ ] Failed sends are queued in chrome.storage.local
-    - [ ] Automatic retry with exponential backoff
-    - [ ] Manual retry from history view
-    - [ ] Maximum retry count with escalation to user
-- [ ] Implement deep linking:
-    - [ ] After successful send, provide link to ctview import view
-    - [ ] Link format: {ctview_url}/imports/{import_id}
-- [ ] Handle CORS setup for extension:
-    - [ ] Document that ctview needs CORS_ALLOW_ORIGIN configured
-    - [ ] Consider: extension pages use chrome-extension:// origin
-    - [ ] Alternative: use host_permissions to bypass CORS for API calls
-      (content script fetch inherits page origin, but background service
-      worker fetch uses extension origin — host_permissions allows this)
-- [ ] Unit tests for SDK integration (mocked responses)
-- [ ] Integration test: full send flow with test server
-
-================================================================================
-PHASE 6: TESTING & QUALITY
-================================================================================
-
-Comprehensive testing across all layers of the extension.
-
-- [ ] Unit testing setup:
-    - [ ] Vitest with WxtVitest plugin
-    - [ ] @webext-core/fake-browser for browser API mocking
-    - [ ] Test helpers for creating mock DOM elements
-    - [ ] Test fixtures for CheckMyFile HTML samples
-- [ ] Unit tests (target: >80% coverage):
-    - [ ] Adapter framework (registry, interface compliance)
-    - [ ] CheckMyFile section extractors (each section separately)
-    - [ ] Normalisation engine (each domain mapping)
-    - [ ] Money parsing (all format variations)
-    - [ ] Date parsing (all format variations)
-    - [ ] Canonical ID generation (determinism, stability)
-    - [ ] Messaging protocol (type safety, round-trip)
-    - [ ] Storage operations (read/write/watch)
-    - [ ] Validation (valid files pass, invalid files fail with good errors)
-- [ ] Integration tests:
-    - [ ] Full pipeline: HTML fixture → extract → normalise → valid CreditFile
-    - [ ] Multiple CRA data separation (CheckMyFile-specific)
-    - [ ] Error propagation through the pipeline
-    - [ ] Storage persistence across simulated service worker restarts
-- [ ] E2E tests (Puppeteer):
-    - [ ] Extension loads in Chrome without errors
-    - [ ] Popup renders and shows correct state
-    - [ ] Side panel renders and settings can be configured
-    - [ ] Content script activates on matching URLs
-    - [ ] Full scrape flow with a local test page mimicking CheckMyFile HTML
-- [ ] Visual regression:
-    - [ ] Screenshot comparison for popup and sidepanel states
-- [ ] Performance testing:
-    - [ ] Measure extraction time for large reports
-    - [ ] Measure normalisation time
-    - [ ] Measure memory usage during extraction
-    - [ ] Ensure content script doesn't degrade target site performance
-- [ ] Security review:
-    - [ ] No sensitive data logged to console in production
-    - [ ] API key stored securely (chrome.storage.sync, not localStorage)
-    - [ ] Content script doesn't expose extracted data to page scripts
-    - [ ] No eval() or dynamic code execution
-    - [ ] CSP compliance verified
-
-================================================================================
-PHASE 7: POLISH & DISTRIBUTION
-================================================================================
-
-Prepare the extension for Chrome Web Store publication and ongoing maintenance.
-
-- [ ] Branding and assets:
-    - [ ] Final extension icon set (all sizes)
-    - [ ] Chrome Web Store screenshots (1280x800)
-    - [ ] Promotional images (440x280 small, 920x680 large)
-    - [ ] Short description (132 chars max)
-    - [ ] Full description
-- [ ] Chrome Web Store listing:
-    - [ ] Privacy policy (what data is collected, where it's sent)
-    - [ ] Permissions justification (why each permission is needed)
-    - [ ] Category selection
-    - [ ] Support URL
-- [ ] Build optimisation:
-    - [ ] Tree-shake unused code
-    - [ ] Minimise bundle size
-    - [ ] Verify no source maps in production build
-    - [ ] Audit dependencies for size and security
-- [ ] CI/CD pipeline (.github/workflows/):
-    - [ ] Lint and type-check on PR
-    - [ ] Run unit tests on PR
-    - [ ] Build extension on PR (verify it compiles)
-    - [ ] Run E2E tests on merge to main
-    - [ ] Auto-publish to Chrome Web Store on version tag
-    - [ ] Use wxt zip for store-ready archive
-- [ ] Documentation:
-    - [ ] README.md with setup, development, and usage instructions
-    - [ ] Architecture overview (adapter pattern, data flow diagram)
-    - [ ] Contributing guide (how to add a new adapter)
-    - [ ] User guide (how to install, configure, and use the extension)
-- [ ] Version management:
-    - [ ] Semantic versioning
-    - [ ] CHANGELOG.md
-    - [ ] Auto-bump version in manifest via CI
-- [ ] Error reporting:
-    - [ ] Structured error logging
-    - [ ] Optional telemetry (opt-in, anonymised)
-    - [ ] User-facing error messages with troubleshooting steps
-- [ ] First Chrome Web Store submission
-- [ ] Verify store review passes (permissions audit, privacy compliance)
-
-================================================================================
 FUTURE: ADDITIONAL ADAPTERS
 ================================================================================
 
@@ -369,5 +173,15 @@ Firefox Support:
 
 CLAUDE SHOULD IGNORE BELOW THIS LINE!
 
+  ---
+  What you still need to do
+
+  1. Faro collector URL — Replace the empty string in src/lib/telemetry/config.ts:8 with your Grafana Cloud Faro collector URL
+  2. GA4 setup — Follow docs/ga4-setup.md to create the GA4 property and get credentials
+  3. GitHub Secrets — Add these to your repository:
+    - GA4_MEASUREMENT_ID, GA4_API_SECRET
+    - FARO_API_KEY, FARO_APP_ID, FARO_STACK_ID, FARO_SOURCE_MAP_ENDPOINT
+  4. Local .env.local — For dev testing: GA4_MEASUREMENT_ID=G-xxx and GA4_API_SECRET=xxx
+
 prompt text (already at start of instruction)
-Consume todos.txt and follow all instructions within it. We are now ready to plan out and implement Phase 3. Please make a comprehensive implementation plan for all tasks listed within the phase, ensuring we are comforming with all defined ADRs in todos.txt. Make use of subagents and agent teams where appropriate during the planning and implementation phases once the plan is approved. Ensure the todos.txt file is updated to mark each phase as complete once it is completed and ensure this initial prompt is included on any plan produced so it is not lost during context compaction.
+Consume todos.txt and follow all instructions within it. We are now ready to plan out and implement Phase 5. Please make a comprehensive implementation plan for all tasks listed within the phase, ensuring we are comforming with all defined ADRs in todos.txt. Make use of subagents and agent teams where appropriate during the planning and implementation phases once the plan is approved. Ensure the todos.txt file is updated to mark each phase as complete once it is completed and ensure this initial prompt is included on any plan produced so it is not lost during context compaction.

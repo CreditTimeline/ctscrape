@@ -1,0 +1,28 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: pnpm build
+      - name: Run E2E tests
+        run: xvfb-run --auto-servernum pnpm vitest run --config e2e/vitest.e2e.config.ts

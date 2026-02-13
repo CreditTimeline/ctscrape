@@ -1,11 +1,25 @@
 import { defineExtensionMessaging } from '@webext-core/messaging';
 import type { PageInfo, RawExtractedData } from '../adapters/types';
 import type { NormalisationResult } from '../normalizer/types';
+import type { ConnectionTestResult } from '../lib/ctview-client';
+import type { LogEntry, LogFilter, LogExportBundle, SupportBundle } from '../lib/logger/types';
+
+/** Result of a sendToCtview operation. */
+export interface SendResult {
+  success: boolean;
+  receiptId?: string;
+  importIds?: string[];
+  error?: string;
+  errorCode?: string;
+  suggestion?: string;
+  duplicate?: boolean;
+  summary?: Record<string, number>;
+}
 
 /**
  * Type-safe messaging protocol between extension contexts.
  *
- * Content script ↔ Background (service worker) ↔ Popup/Sidepanel
+ * Content script <-> Background (service worker) <-> Popup/Sidepanel
  */
 interface ProtocolMap {
   /** Content script detected a supported report page */
@@ -26,17 +40,47 @@ interface ProtocolMap {
   /** Background has finished normalisation — data ready for review */
   normaliseComplete(data: { result: NormalisationResult }): void;
 
-  /** User approved sending data to ctview */
-  sendToCtview(): void;
+  /** User approved sending data to ctview — returns result directly */
+  sendToCtview(): SendResult;
 
-  /** Background reports send result */
+  /** Background reports send result (broadcast for popup) */
   sendResult(data: { success: boolean; receiptId?: string; error?: string }): void;
+
+  /** Test connection to ctview server */
+  testConnection(): ConnectionTestResult;
+
+  /** Request manual retry of a failed send from history */
+  manualRetry(data: { historyId: string }): SendResult;
 
   /** Popup/sidepanel requests extraction via background (not direct to content) */
   triggerExtract(): void;
 
   /** Popup/sidepanel requests current extension state */
   getStatus(): ExtensionStatus;
+
+  /** Content/sidepanel sends log entries to background for storage */
+  logEntries(data: { entries: LogEntry[] }): void;
+
+  /** Request stored log entries with optional filter */
+  getLogs(data: { filter?: LogFilter }): LogEntry[];
+
+  /** Export all logs as a sanitised bundle */
+  exportLogs(): LogExportBundle;
+
+  /** Clear all stored logs */
+  clearLogs(): void;
+
+  /** Export a comprehensive support bundle */
+  exportSupportBundle(): SupportBundle;
+
+  /** Track a GA4 analytics event from non-background contexts */
+  trackEvent(data: { eventName: string; params: Record<string, string | number> }): void;
+
+  /** Forward telemetry data from content scripts to background Faro collector */
+  telemetryEvent(data: {
+    type: 'error' | 'log' | 'event' | 'measurement';
+    payload: Record<string, unknown>;
+  }): void;
 }
 
 /** Current state of the extension, returned by getStatus */

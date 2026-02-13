@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NormalisationResult } from '../../../normalizer/types';
   import type { ExtractionState } from '../../../extraction/types';
+  import type { SendResult } from '../../../utils/messaging';
   import ConfirmDialog from '../../../components/ConfirmDialog.svelte';
   import EntitySummary from '../../../components/EntitySummary.svelte';
   import ProgressBar from '../../../components/ProgressBar.svelte';
@@ -9,11 +10,13 @@
     result,
     extractionState,
     serverUrl,
+    sendResult = null,
     onsend,
   }: {
     result: NormalisationResult | undefined;
     extractionState: ExtractionState;
     serverUrl: string;
+    sendResult?: SendResult | null;
     onsend: () => void;
   } = $props();
 
@@ -22,6 +25,7 @@
   let canSend = $derived(extractionState === 'ready' && result?.success === true);
   let isSending = $derived(extractionState === 'sending');
   let isComplete = $derived(extractionState === 'complete');
+  let isError = $derived(extractionState === 'error');
 
   function handleSendClick() {
     confirmOpen = true;
@@ -35,6 +39,12 @@
   function handleCancel() {
     confirmOpen = false;
   }
+
+  function importUrl(sendRes: SendResult): string | null {
+    if (!serverUrl || !sendRes.importIds?.length) return null;
+    const base = serverUrl.replace(/\/$/, '');
+    return `${base}/imports/${sendRes.importIds[0]}`;
+  }
 </script>
 
 {#if result}
@@ -44,12 +54,27 @@
     {#if isSending}
       <ProgressBar />
       <p class="status-text">Sending data to ctview...</p>
-    {:else if isComplete}
+    {:else if isComplete && sendResult?.success}
       <p class="status-text success">Data sent successfully.</p>
-      {#if serverUrl}
+      {#if sendResult.duplicate}
+        <p class="status-text info">This data was already imported (duplicate detected).</p>
+      {/if}
+      {#if importUrl(sendResult)}
+        <a class="ctview-link" href={importUrl(sendResult)} target="_blank" rel="noopener noreferrer">
+          View import in ctview
+        </a>
+      {:else if serverUrl}
         <a class="ctview-link" href={serverUrl} target="_blank" rel="noopener noreferrer">
           Open ctview
         </a>
+      {/if}
+    {:else if isError && sendResult && !sendResult.success}
+      <p class="status-text error">{sendResult.error}</p>
+      {#if sendResult.suggestion}
+        <p class="status-text suggestion">{sendResult.suggestion}</p>
+      {/if}
+      {#if sendResult.duplicate}
+        <p class="status-text info">This data was already imported.</p>
       {/if}
     {:else}
       <div class="actions">
@@ -128,6 +153,20 @@
 
   .status-text.warning {
     color: var(--ct-color-warning);
+  }
+
+  .status-text.error {
+    color: var(--ct-color-error);
+  }
+
+  .status-text.info {
+    color: var(--ct-color-text-muted);
+    font-style: italic;
+  }
+
+  .status-text.suggestion {
+    color: var(--ct-color-text-muted);
+    font-style: italic;
   }
 
   .ctview-link {

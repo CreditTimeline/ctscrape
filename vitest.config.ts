@@ -7,5 +7,21 @@ export default defineConfig({
   test: {
     mockReset: true,
     restoreMocks: true,
+    exclude: ['e2e/**', 'node_modules/**'],
+    coverage: {
+      provider: 'v8',
+      enabled: false,
+      reportsDirectory: './coverage',
+      reporter: ['text', 'text-summary', 'html'],
+      include: ['src/**/*.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/__tests__/**',
+        'src/**/fixtures/**',
+        'src/types/**',
+        'src/**/*.d.ts',
+      ],
+      thresholds: { statements: 80, branches: 75, functions: 80, lines: 80 },
+    },
   },
 });

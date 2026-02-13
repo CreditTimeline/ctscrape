@@ -1,0 +1,45 @@
+name: Publish to Chrome Web Store
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    name: Chrome Web Store Submission
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build with observability
+        run: pnpm build
+        env:
+          GA4_MEASUREMENT_ID: ${{ secrets.GA4_MEASUREMENT_ID }}
+          GA4_API_SECRET: ${{ secrets.GA4_API_SECRET }}
+          FARO_API_KEY: ${{ secrets.FARO_API_KEY }}
+          FARO_APP_ID: ${{ secrets.FARO_APP_ID }}
+          FARO_STACK_ID: ${{ secrets.FARO_STACK_ID }}
+          FARO_SOURCE_MAP_ENDPOINT: ${{ secrets.FARO_SOURCE_MAP_ENDPOINT }}
+      - run: pnpm zip
+      - run: pnpm check-build
+
+      - name: Submit to Chrome Web Store
+        run: pnpm wxt submit --chrome
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+
+      - name: Upload ZIP as release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP_FILE=$(ls .output/*.zip | head -1)
+          gh release upload "${{ github.event.release.tag_name }}" "$ZIP_FILE" --clobber

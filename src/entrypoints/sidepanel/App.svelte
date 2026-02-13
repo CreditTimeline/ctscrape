@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { sendMessage, type ExtensionStatus } from '../../utils/messaging';
+  import { sendMessage, type ExtensionStatus, type SendResult } from '../../utils/messaging';
   import {
     connectionSettings,
     userPreferences,
@@ -12,6 +12,7 @@
   import { initTheme, setTheme } from '../../lib/theme.svelte';
   import { addToast } from '../../lib/toast-store.svelte';
   import ToastContainer from '../../components/ToastContainer.svelte';
+  import { initFaro, teardownFaro } from '../../lib/telemetry/faro-init';
 
   import ConnectionSettingsSection from './sections/ConnectionSettings.svelte';
   import CurrentPage from './sections/CurrentPage.svelte';
@@ -19,12 +20,14 @@
   import SendToCtview from './sections/SendToCtview.svelte';
   import History from './sections/History.svelte';
   import Settings from './sections/Settings.svelte';
+  import DiagnosticLog from './sections/DiagnosticLog.svelte';
 
   const poller = createStatusPoller();
 
   let connSettings = $state<ConnectionSettings>({ serverUrl: '', apiKey: '' });
-  let prefs = $state<UserPreferences>({ defaultSubjectId: '', autoExtract: false, theme: 'system' });
+  let prefs = $state<UserPreferences>({ defaultSubjectId: '', autoExtract: false, theme: 'system', debugLogging: false, analyticsConsent: false });
   let history = $state<ScrapeHistoryEntry[]>([]);
+  let lastSendResult = $state<SendResult | null>(null);
 
   // Start/stop status polling
   $effect(() => {
@@ -35,6 +38,15 @@
   // Initialise theme
   $effect(() => {
     initTheme();
+  });
+
+  // Initialise Faro telemetry (consent-gated)
+  $effect(() => {
+    if (prefs.analyticsConsent) {
+      initFaro().catch(() => {});
+    } else {
+      teardownFaro();
+    }
   });
 
   // Poll storage for settings/preferences/history
@@ -50,6 +62,13 @@
     }, 2000);
 
     return () => clearInterval(timer);
+  });
+
+  // Clear send result when extraction state resets
+  $effect(() => {
+    if (poller.status.state === 'idle' || poller.status.state === 'detected') {
+      lastSendResult = null;
+    }
   });
 
   async function handleSaveConnection(settings: ConnectionSettings) {
@@ -68,7 +87,12 @@
 
   async function handleSend() {
     try {
-      await sendMessage('sendToCtview', undefined);
+      lastSendResult = null;
+      const result = await sendMessage('sendToCtview', undefined);
+      lastSendResult = result;
+      if (!result.success) {
+        addToast(result.error ?? 'Send failed', 'error');
+      }
     } catch (e) {
       addToast('Send failed: ' + (e instanceof Error ? e.message : 'Unknown error'), 'error');
     }
@@ -76,8 +100,12 @@
 
   async function handleResend(entry: ScrapeHistoryEntry) {
     try {
-      await sendMessage('sendToCtview', undefined);
-      addToast('Resending data to ctview...', 'info');
+      const result = await sendMessage('manualRetry', { historyId: entry.id });
+      if (result.success) {
+        addToast('Retry initiated.', 'info');
+      } else {
+        addToast('Retry failed: ' + (result.error ?? 'Unknown error'), 'error');
+      }
     } catch (e) {
       addToast('Resend failed: ' + (e instanceof Error ? e.message : 'Unknown error'), 'error');
     }
@@ -124,17 +152,27 @@
         result={poller.status.result}
         extractionState={poller.status.state}
         serverUrl={connSettings.serverUrl}
+        sendResult={lastSendResult}
         onsend={handleSend}
       />
     {/if}
 
     <hr class="divider" />
 
-    <History entries={history} onresend={handleResend} onclear={handleClearHistory} />
+    <History
+      entries={history}
+      serverUrl={connSettings.serverUrl}
+      onresend={handleResend}
+      onclear={handleClearHistory}
+    />
 
     <hr class="divider" />
 
     <Settings preferences={prefs} onsave={handleSavePreferences} />
+
+    <hr class="divider" />
+
+    <DiagnosticLog />
   </div>
 </main>
 

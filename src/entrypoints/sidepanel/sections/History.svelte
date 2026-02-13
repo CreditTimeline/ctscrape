@@ -5,10 +5,12 @@
 
   let {
     entries,
+    serverUrl = '',
     onresend,
     onclear,
   }: {
     entries: ScrapeHistoryEntry[];
+    serverUrl?: string;
     onresend: (entry: ScrapeHistoryEntry) => void;
     onclear: () => void;
   } = $props();
@@ -23,6 +25,12 @@
 
   function totalEntities(counts: Record<string, number>): number {
     return Object.values(counts).reduce((sum, n) => sum + n, 0);
+  }
+
+  function importLink(entry: ScrapeHistoryEntry): string | null {
+    if (!serverUrl || entry.status !== 'sent' || !entry.receiptId) return null;
+    const base = serverUrl.replace(/\/$/, '');
+    return `${base}/imports/${entry.receiptId}`;
   }
 </script>
 
@@ -42,7 +50,18 @@
         <li class="entry">
           <div class="entry-header">
             <span class="site-name">{entry.siteName}</span>
-            <span class="status-dot" style:background={statusColors[entry.status]}></span>
+            <div class="entry-header-right">
+              {#if importLink(entry)}
+                <a
+                  class="import-link"
+                  href={importLink(entry)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="View in ctview"
+                >&#8599;</a>
+              {/if}
+              <span class="status-dot" style:background={statusColors[entry.status]}></span>
+            </div>
           </div>
           <div class="entry-meta">
             <span class="date">{formatDateTime(entry.extractedAt)}</span>
@@ -120,6 +139,23 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .entry-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--ct-space-2);
+  }
+
+  .import-link {
+    font-size: var(--ct-font-size-sm);
+    color: var(--ct-color-primary);
+    text-decoration: none;
+    line-height: 1;
+  }
+
+  .import-link:hover {
+    text-decoration: underline;
   }
 
   .site-name {
