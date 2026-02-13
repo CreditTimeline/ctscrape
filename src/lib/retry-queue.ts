@@ -3,7 +3,7 @@
  * exponential backoff for automatic retry.
  */
 
-import { retryQueue, scrapeHistory, type RetryQueueItem } from '../utils/storage';
+import { retryQueue, scrapeHistory, type RetryQueueItem, type ScrapeHistoryEntry } from '../utils/storage';
 import { getClient, classifySendError } from './ctview-client';
 
 const MAX_RETRIES = 5;
@@ -20,7 +20,7 @@ function calculateDelay(retryCount: number): number {
 /** Update a history entry by id with a partial update. */
 async function updateHistoryEntry(
   historyId: string,
-  update: Partial<Pick<import('../utils/storage').ScrapeHistoryEntry, 'status' | 'sentAt' | 'receiptId' | 'error'>>,
+  update: Partial<Pick<ScrapeHistoryEntry, 'status' | 'sentAt' | 'receiptId' | 'error'>>,
 ): Promise<void> {
   const history = await scrapeHistory.getValue();
   const idx = history.findIndex((h) => h.id === historyId);
