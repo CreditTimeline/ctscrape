@@ -3,6 +3,7 @@
   "description": "Browser extension that scrapes credit report data and sends it to ctview",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@10.29.2",
   "type": "module",
   "scripts": {
     "dev": "wxt",
