@@ -1,13 +1,13 @@
-import type { RawExtractedData } from '../adapters/types';
+import type { RawExtractedData, PageInfo } from '../adapters/types';
+import type { CreditFile } from './credit-file.types';
 
 /**
  * Result of normalising raw extracted data into a ctspec CreditFile.
- * The CreditFile type will be imported from ctspec/SDK once integrated.
  */
 export interface NormalisationResult {
   success: boolean;
   /** The normalised ctspec CreditFile payload (ready to send to ctview) */
-  creditFile: CreditFilePayload | null;
+  creditFile: CreditFile | null;
   /** Validation errors that prevent sending */
   errors: NormalisationError[];
   /** Non-blocking quality warnings */
@@ -43,11 +43,8 @@ export interface NormalisationSummary {
   noticesOfCorrection: number;
 }
 
-/**
- * Placeholder for the ctspec CreditFile type.
- * TODO Phase 5: Replace with proper type from @ctview/sdk or ctspec.
- */
-export type CreditFilePayload = Record<string, unknown>;
+export type { CreditFile } from './credit-file.types';
+export type { CreditFile as CreditFilePayload } from './credit-file.types';
 
 /** Configuration for the normalisation engine */
 export interface NormaliserConfig {
@@ -61,4 +58,5 @@ export interface NormaliserConfig {
 export interface NormaliserInput {
   rawData: RawExtractedData;
   config: NormaliserConfig;
+  pageInfo?: PageInfo;
 }

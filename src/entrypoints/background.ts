@@ -1,6 +1,6 @@
 import { onMessage, sendMessage } from '@/utils/messaging';
 import * as orchestrator from '@/extraction/orchestrator';
-import type { NormalisationResult } from '@/normalizer/types';
+import { normalise } from '@/normalizer/engine';
 
 export default defineBackground(() => {
   console.log('[ctscrape] service worker started');
@@ -43,29 +43,22 @@ export default defineBackground(() => {
       pageUrl: data.rawData.metadata.pageUrl,
     });
 
-    // Phase 1 stub: normalisation not yet implemented.
-    // Immediately complete with a stub result so the full message flow can be tested.
-    const stubResult: NormalisationResult = {
-      success: false,
-      creditFile: null,
-      errors: [{ domain: 'system', message: 'Normalisation not yet implemented' }],
-      warnings: [],
-      summary: {
-        personNames: 0,
-        addresses: 0,
-        tradelines: 0,
-        searches: 0,
-        creditScores: 0,
-        publicRecords: 0,
-        electoralRollEntries: 0,
-        financialAssociates: 0,
-        fraudMarkers: 0,
-        noticesOfCorrection: 0,
+    // Normalise the raw data into a CreditFile
+    const result = normalise({
+      rawData: data.rawData,
+      config: {
+        defaultSubjectId: 'subject:default',
+        currencyCode: 'GBP',
       },
-    };
+    });
 
-    orchestrator.onNormalisationComplete(tabId, stubResult);
-    console.log('[ctscrape] stub normalisation complete on tab', tabId);
+    orchestrator.onNormalisationComplete(tabId, result);
+    console.log('[ctscrape] normalisation complete on tab', tabId, {
+      success: result.success,
+      errors: result.errors.length,
+      warnings: result.warnings.length,
+      summary: result.summary,
+    });
   });
 
   onMessage('extractError', ({ data, sender }) => {

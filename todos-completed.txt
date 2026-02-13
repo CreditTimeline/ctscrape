@@ -135,3 +135,74 @@ DOM, not assumptions.
 - [x] Unit tests for each section extractor (106 tests across 7 section test files)
 - [x] Integration test: full page extraction → RawExtractedData (9 tests)
 - [x] 150 total tests, all passing. TypeScript strict, pnpm build clean.
+
+================================================================================
+PHASE 3: DATA NORMALISATION & MAPPING [COMPLETED]
+================================================================================
+
+Convert raw extracted data from any adapter into a valid ctspec CreditFile
+payload. This is the bridge between site-specific DOM extraction and the
+canonical data model.
+
+- [x] Create normalisation engine (src/normalizer/engine.ts):
+    - [x] Takes RawExtractedData → produces CreditFile (ctspec format)
+    - [x] Handles ID generation (deterministic, reproducible)
+    - [x] Sets file_id, subject_id, created_at, schema_version
+    - [x] Creates import batches from adapter metadata
+- [x] Implement field mapping for each domain:
+    - [x] Subject identity (names, DOB, identifiers)
+    - [x] Addresses (parse UK addresses, generate normalised single-line)
+    - [x] Address associations (map roles from raw text to enum)
+    - [x] Organisations (furnisher/searcher entities)
+    - [x] Tradelines:
+        - [x] Account type mapping (raw provider text → canonical enum)
+          Reference: ctspec/mappings/account-type-crosswalk-v1.csv
+        - [x] Status mapping (raw provider text → canonical status)
+          Reference: ctspec/mappings/account-status-crosswalk-v1.csv
+        - [x] Terms extraction and normalisation
+        - [x] Snapshot generation (current balances, limits)
+        - [x] Monthly metrics (payment history → time series)
+          Reference: ctspec/mappings/payment-status-crosswalk-v1.csv
+        - [x] Event detection (defaults, delinquencies, settlements)
+        - [x] Identifier extraction (masked account numbers)
+    - [x] Searches (credit enquiries):
+        - [x] Search type mapping (raw text → canonical enum)
+          Reference: ctspec/mappings/search-type-crosswalk-v1.csv
+        - [x] Visibility classification (hard/soft/unknown)
+    - [x] Credit scores (score values, bands, factors)
+    - [x] Public records (CCJ amounts, dates, status)
+    - [x] Electoral roll entries
+    - [x] Financial associates
+    - [x] Fraud markers (if available)
+    - [x] Notices of correction (if available)
+- [x] Implement money parsing:
+    - [x] Parse £1,234.56 → 123456 (pence, integer minor units)
+    - [x] Handle negative amounts, zero, missing values
+    - [x] Handle currency symbols and variations
+- [x] Implement date normalisation:
+    - [x] Parse DD/MM/YYYY, D MMM YYYY, DD-Mon-YYYY, YYYY-MM-DD, etc.
+    - [x] Output ISO 8601 (YYYY-MM-DD for dates, YYYY-MM for periods)
+    - [x] Handle missing/partial dates gracefully
+- [x] Implement canonical ID generation:
+    - [x] Deterministic tradeline.canonical_id from account properties
+    - [x] Stable across re-scrapes of the same account
+    - [x] Uses: furnisher name + account type + masked account number + open date
+- [x] Implement provenance/artifact generation:
+    - [x] Create RawArtifact entries with SHA-256, timestamps, URLs
+    - [x] Set acquisition_method = "html_scrape"
+    - [x] Set source_wrapper = adapter name
+    - [x] Include adapter version in mapping_version
+- [x] Ship enum and mapping data with the extension:
+    - [x] Bundle ctspec enum values for offline validation
+    - [x] Bundle crosswalk tables for offline mapping
+    - [x] Version these and check for updates
+- [x] Implement validation:
+    - [x] Validate output CreditFile against ctspec JSON schema
+    - [x] Generate human-readable validation errors
+    - [x] Quality warnings (low confidence, missing optional data)
+    - [x] Referential integrity checks (source_import_id refs, FK refs)
+- [x] Unit tests for each mapping domain
+- [x] Unit tests for money and date parsing
+- [x] Unit tests for canonical ID generation
+- [x] Integration test: RawExtractedData → valid CreditFile
+- [x] Edge case tests: empty data, partial data, malformed data
