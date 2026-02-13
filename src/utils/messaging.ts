@@ -32,6 +32,9 @@ interface ProtocolMap {
   /** Background reports send result */
   sendResult(data: { success: boolean; receiptId?: string; error?: string }): void;
 
+  /** Popup/sidepanel requests extraction via background (not direct to content) */
+  triggerExtract(): void;
+
   /** Popup/sidepanel requests current extension state */
   getStatus(): ExtensionStatus;
 }

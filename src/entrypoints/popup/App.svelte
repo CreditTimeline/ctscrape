@@ -1,37 +1,56 @@
 <script lang="ts">
+  import { sendMessage } from '../../utils/messaging';
   import { connectionSettings } from '../../utils/storage';
+  import { createStatusPoller } from '../../lib/status-poller.svelte';
+  import StatusBadge from '../../components/StatusBadge.svelte';
 
-  let status = $state<'idle' | 'detected' | 'extracting' | 'error'>('idle');
+  const poller = createStatusPoller();
+
   let ctviewUrl = $state('');
+
+  $effect(() => {
+    poller.start();
+    return () => poller.stop();
+  });
 
   $effect(() => {
     connectionSettings.getValue().then((settings) => {
       ctviewUrl = settings.serverUrl;
     });
   });
+
+  let canScrape = $derived(poller.status.state === 'detected');
+
+  async function handleScrape() {
+    await sendMessage('triggerExtract', undefined);
+  }
+
+  async function openSidePanel() {
+    const win = await browser.windows.getCurrent();
+    await browser.sidePanel.open({ windowId: win.id! });
+  }
 </script>
 
 <main>
-  <h1>ctscrape</h1>
+  <header class="header">
+    <h1>ctscrape</h1>
+    <StatusBadge state={poller.status.state} />
+  </header>
 
-  <div class="status">
-    {#if status === 'idle'}
-      <p class="muted">No supported credit report detected on this page.</p>
-    {:else if status === 'detected'}
-      <p class="ready">Credit report detected — ready to scrape.</p>
-      <button>Extract Data</button>
-    {:else if status === 'extracting'}
-      <p>Extracting...</p>
-    {:else if status === 'error'}
-      <p class="error">An error occurred.</p>
-    {/if}
+  <div class="actions">
+    <button class="btn btn-primary" disabled={!canScrape} onclick={handleScrape}>
+      Scrape This Page
+    </button>
+    <button class="btn btn-secondary" onclick={openSidePanel}>
+      Open Side Panel
+    </button>
   </div>
 
-  <div class="connection">
+  <footer class="connection">
     {#if ctviewUrl}
-      <p class="muted">Connected to {ctviewUrl}</p>
+      <span class="connection-ok">Connected to {ctviewUrl}</span>
     {:else}
-      <p class="warning">ctview not configured — open settings to connect.</p>
+      <span class="connection-warn">ctview not configured</span>
     {/if}
-  </div>
+  </footer>
 </main>

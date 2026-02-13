@@ -1,0 +1,8 @@
+@import '../../styles/tokens.css';
+@import '../../styles/reset.css';
+
+body {
+  width: 100%;
+  min-height: 100vh;
+  overflow-y: auto;
+}

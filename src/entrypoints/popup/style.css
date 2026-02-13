@@ -1,75 +1,73 @@
-:root {
-  --color-text: #1a1a2e;
-  --color-muted: #6b7280;
-  --color-bg: #ffffff;
-  --color-primary: #3b82f6;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #ef4444;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+@import '../../styles/tokens.css';
+@import '../../styles/reset.css';
 
 body {
   width: 320px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
-  color: var(--color-text);
-  background: var(--color-bg);
 }
 
 main {
-  padding: 16px;
+  padding: var(--ct-space-4);
 }
 
-h1 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 12px;
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--ct-space-3);
 }
 
-.status {
-  margin-bottom: 12px;
+.header h1 {
+  font-size: var(--ct-font-size-lg);
+  font-weight: var(--ct-font-weight-semibold);
 }
 
-.muted {
-  color: var(--color-muted);
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ct-space-2);
+  margin-bottom: var(--ct-space-3);
 }
 
-.ready {
-  color: var(--color-success);
+.btn {
+  display: block;
+  width: 100%;
+  padding: var(--ct-space-2) var(--ct-space-4);
+  border-radius: var(--ct-radius-md);
+  font-size: var(--ct-font-size-base);
+  font-weight: var(--ct-font-weight-medium);
+  text-align: center;
+  transition: opacity var(--ct-transition-fast);
 }
 
-.warning {
-  color: var(--color-warning);
-}
-
-.error {
-  color: var(--color-error);
-}
-
-button {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: var(--color-primary);
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-button:hover {
+.btn:hover:not(:disabled) {
   opacity: 0.9;
 }
 
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--ct-color-primary);
+  color: var(--ct-color-text-inverse);
+}
+
+.btn-secondary {
+  background: var(--ct-color-bg-muted);
+  color: var(--ct-color-text);
+}
+
 .connection {
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-  font-size: 12px;
+  padding-top: var(--ct-space-3);
+  border-top: 1px solid var(--ct-color-border);
+  font-size: var(--ct-font-size-sm);
+}
+
+.connection-ok {
+  color: var(--ct-color-text-muted);
+}
+
+.connection-warn {
+  color: var(--ct-color-warning);
 }

@@ -1,0 +1,101 @@
+/*
+ * Shared design tokens — CSS custom properties.
+ * Light theme is the default; dark theme overrides via [data-theme="dark"].
+ */
+
+:root {
+  /* Brand */
+  --ct-color-primary: #3b82f6;
+  --ct-color-primary-hover: #2563eb;
+
+  /* Surfaces */
+  --ct-color-bg: #ffffff;
+  --ct-color-bg-subtle: #f9fafb;
+  --ct-color-bg-muted: #f3f4f6;
+  --ct-color-surface: #ffffff;
+  --ct-color-border: #e5e7eb;
+  --ct-color-border-subtle: #f3f4f6;
+
+  /* Text */
+  --ct-color-text: #1a1a2e;
+  --ct-color-text-muted: #6b7280;
+  --ct-color-text-inverse: #ffffff;
+
+  /* Semantic */
+  --ct-color-success: #10b981;
+  --ct-color-success-bg: #ecfdf5;
+  --ct-color-warning: #f59e0b;
+  --ct-color-warning-bg: #fffbeb;
+  --ct-color-error: #ef4444;
+  --ct-color-error-bg: #fef2f2;
+  --ct-color-info: #3b82f6;
+  --ct-color-info-bg: #eff6ff;
+
+  /* Badge state colours (for action badge + StatusBadge) */
+  --ct-badge-idle: #9ca3af;
+  --ct-badge-detected: #3b82f6;
+  --ct-badge-extracting: #f59e0b;
+  --ct-badge-normalising: #f59e0b;
+  --ct-badge-ready: #10b981;
+  --ct-badge-sending: #f59e0b;
+  --ct-badge-complete: #10b981;
+  --ct-badge-error: #ef4444;
+
+  /* Typography */
+  --ct-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ct-font-size-xs: 11px;
+  --ct-font-size-sm: 12px;
+  --ct-font-size-base: 14px;
+  --ct-font-size-lg: 16px;
+  --ct-font-size-xl: 18px;
+  --ct-font-weight-normal: 400;
+  --ct-font-weight-medium: 500;
+  --ct-font-weight-semibold: 600;
+
+  /* Spacing */
+  --ct-space-1: 4px;
+  --ct-space-2: 8px;
+  --ct-space-3: 12px;
+  --ct-space-4: 16px;
+  --ct-space-5: 20px;
+  --ct-space-6: 24px;
+  --ct-space-8: 32px;
+
+  /* Radii */
+  --ct-radius-sm: 4px;
+  --ct-radius-md: 6px;
+  --ct-radius-lg: 8px;
+  --ct-radius-full: 9999px;
+
+  /* Shadows */
+  --ct-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --ct-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07);
+
+  /* Transitions */
+  --ct-transition-fast: 150ms ease;
+  --ct-transition-normal: 200ms ease;
+}
+
+[data-theme='dark'] {
+  --ct-color-primary: #60a5fa;
+  --ct-color-primary-hover: #93bbfd;
+
+  --ct-color-bg: #1a1a2e;
+  --ct-color-bg-subtle: #1e1e36;
+  --ct-color-bg-muted: #252540;
+  --ct-color-surface: #222240;
+  --ct-color-border: #3a3a5c;
+  --ct-color-border-subtle: #2e2e4a;
+
+  --ct-color-text: #e5e7eb;
+  --ct-color-text-muted: #9ca3af;
+  --ct-color-text-inverse: #1a1a2e;
+
+  --ct-color-success-bg: #064e3b;
+  --ct-color-warning-bg: #451a03;
+  --ct-color-error-bg: #450a0a;
+  --ct-color-info-bg: #1e3a5f;
+
+  --ct-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --ct-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+}

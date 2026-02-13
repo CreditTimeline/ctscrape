@@ -96,66 +96,66 @@ AD-010: Validation Before Send
 
 
 ================================================================================
-PHASE 4: EXTENSION UI
+PHASE 4: EXTENSION UI [COMPLETED]
 ================================================================================
 
 Build the Svelte 5 UI for the extension's side panel and popup. The side panel
 is the primary interface; the popup provides quick actions.
 
-- [ ] Create extension icons:
-    - [ ] Design icon set (16x16, 32x32, 48x48, 128x128 PNG)
-    - [ ] Use a distinctive design that complements the ctview brand
-- [ ] Implement popup (quick actions):
-    - [ ] Show current page status (adapter detected / not supported / extracting)
-    - [ ] "Scrape This Page" button (if adapter detected)
-    - [ ] "Open Side Panel" button
-    - [ ] Connection status indicator (ctview reachable / unreachable / not configured)
-    - [ ] Badge on extension icon showing state (idle, detected, extracting, error)
-- [ ] Implement side panel (main UI):
-    - [ ] Connection settings:
-        - [ ] ctview server URL input
-        - [ ] API key input (masked)
-        - [ ] Test connection button
-        - [ ] Connection status indicator
-        - [ ] Save to chrome.storage.sync
-    - [ ] Current page section:
-        - [ ] Detected site/adapter info
-        - [ ] Subject name and report date (from getPageInfo)
-        - [ ] "Extract Data" button with progress indicator
-    - [ ] Extraction results / data preview:
-        - [ ] Summary of extracted data (entity counts per domain)
-        - [ ] Expandable sections showing extracted data
-        - [ ] Validation status (pass/fail with details)
-        - [ ] Quality warnings (confidence levels, missing data)
-    - [ ] Send to ctview:
-        - [ ] "Send to ctview" button (enabled only when data is valid)
-        - [ ] Pre-send confirmation dialog showing what will be sent
-        - [ ] Progress indicator during send
-        - [ ] Success/failure feedback with details
-        - [ ] Link to view imported data in ctview (deep link to import)
-    - [ ] History section:
-        - [ ] List of recent scrapes (date, site, status, entity counts)
-        - [ ] Re-send failed scrapes
-        - [ ] Clear history
-    - [ ] Settings section:
-        - [ ] Default subject ID (for matching across imports)
-        - [ ] Auto-extract on page load toggle
-        - [ ] Theme (light/dark, follow system)
-- [ ] Implement action badge (extension icon):
-    - [ ] Grey: no adapter for current page
-    - [ ] Blue: adapter detected, ready to scrape
-    - [ ] Yellow: extraction in progress
-    - [ ] Green: data extracted and valid
-    - [ ] Red: error occurred
-- [ ] Create shared Svelte components:
-    - [ ] StatusBadge.svelte
-    - [ ] EntitySummary.svelte
-    - [ ] ValidationErrors.svelte
-    - [ ] SettingsForm.svelte
-    - [ ] ProgressBar.svelte
-    - [ ] Toast notifications
-- [ ] Implement responsive layout (side panel is narrow: ~350px)
-- [ ] Test UI with sample data (mock extraction results)
+- [x] Create extension icons:
+    - [x] Design icon set (16x16, 32x32, 48x48, 128x128 PNG)
+    - [x] Use a distinctive design that complements the ctview brand
+- [x] Implement popup (quick actions):
+    - [x] Show current page status (adapter detected / not supported / extracting)
+    - [x] "Scrape This Page" button (if adapter detected)
+    - [x] "Open Side Panel" button
+    - [x] Connection status indicator (ctview reachable / unreachable / not configured)
+    - [x] Badge on extension icon showing state (idle, detected, extracting, error)
+- [x] Implement side panel (main UI):
+    - [x] Connection settings:
+        - [x] ctview server URL input
+        - [x] API key input (masked)
+        - [x] Test connection button
+        - [x] Connection status indicator
+        - [x] Save to chrome.storage.sync
+    - [x] Current page section:
+        - [x] Detected site/adapter info
+        - [x] Subject name and report date (from getPageInfo)
+        - [x] "Extract Data" button with progress indicator
+    - [x] Extraction results / data preview:
+        - [x] Summary of extracted data (entity counts per domain)
+        - [x] Expandable sections showing extracted data
+        - [x] Validation status (pass/fail with details)
+        - [x] Quality warnings (confidence levels, missing data)
+    - [x] Send to ctview:
+        - [x] "Send to ctview" button (enabled only when data is valid)
+        - [x] Pre-send confirmation dialog showing what will be sent
+        - [x] Progress indicator during send
+        - [x] Success/failure feedback with details
+        - [x] Link to view imported data in ctview (deep link to import)
+    - [x] History section:
+        - [x] List of recent scrapes (date, site, status, entity counts)
+        - [x] Re-send failed scrapes
+        - [x] Clear history
+    - [x] Settings section:
+        - [x] Default subject ID (for matching across imports)
+        - [x] Auto-extract on page load toggle
+        - [x] Theme (light/dark, follow system)
+- [x] Implement action badge (extension icon):
+    - [x] Grey: no adapter for current page
+    - [x] Blue: adapter detected, ready to scrape
+    - [x] Yellow: extraction in progress
+    - [x] Green: data extracted and valid
+    - [x] Red: error occurred
+- [x] Create shared Svelte components:
+    - [x] StatusBadge.svelte
+    - [x] EntitySummary.svelte
+    - [x] ValidationErrors.svelte
+    - [x] SettingsForm.svelte
+    - [x] ProgressBar.svelte
+    - [x] Toast notifications
+- [x] Implement responsive layout (side panel is narrow: ~350px)
+- [x] Test UI with sample data (mock extraction results)
 
 ================================================================================
 PHASE 5: CTVIEW INTEGRATION
