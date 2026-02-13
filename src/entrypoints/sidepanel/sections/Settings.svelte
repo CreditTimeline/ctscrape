@@ -56,11 +56,13 @@
         bind:value={subjectId}
       />
     </label>
+    <p class="help-text">Identifies whose credit data this is. Used to group imports in ctview.</p>
 
     <label class="checkbox-field">
       <input type="checkbox" bind:checked={autoExtract} />
       <span class="label">Auto-extract on page load</span>
     </label>
+    <p class="help-text">Automatically extract when a supported page is detected.</p>
 
     <label class="checkbox-field">
       <input type="checkbox" bind:checked={debugLogging} />
@@ -177,13 +179,6 @@
 
   .radio input[type='radio'] {
     accent-color: var(--ct-color-primary);
-  }
-
-  .help-text {
-    font-size: var(--ct-font-size-xs);
-    color: var(--ct-color-text-muted);
-    margin-top: var(--ct-space-1);
-    line-height: 1.4;
   }
 
   .actions {

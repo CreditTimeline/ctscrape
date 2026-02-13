@@ -26,6 +26,9 @@
 
   {#if state === 'idle'}
     <p class="hint">Navigate to a supported credit report page to begin.</p>
+    <p class="hint-detail">
+      Supported: <a href="https://www.checkmyfile.com/download" target="_blank" rel="noopener noreferrer">CheckMyFile</a> download page.
+    </p>
   {:else if pageInfo}
     <div class="page-info">
       <div class="info-row">
@@ -84,6 +87,11 @@
 
   .hint {
     font-size: var(--ct-font-size-sm);
+    color: var(--ct-color-text-muted);
+  }
+
+  .hint-detail {
+    font-size: var(--ct-font-size-xs);
     color: var(--ct-color-text-muted);
   }
 

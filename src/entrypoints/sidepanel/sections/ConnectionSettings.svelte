@@ -52,6 +52,10 @@
 <ExpandableSection title="Connection Settings" open={!isConfigured}>
   {#snippet children()}
     <div class="form">
+      <p class="help-text">
+        Connect to your <a href="https://credittimeline.uk/ctview" target="_blank" rel="noopener noreferrer">ctview</a> instance to store and analyse extracted credit data.
+      </p>
+
       <label class="field">
         <span class="label">ctview Server URL</span>
         <input
@@ -81,6 +85,8 @@
           </button>
         </div>
       </label>
+
+      <p class="help-text">Find your API key in ctview under Settings &rarr; API Keys.</p>
 
       <div class="actions">
         <button
@@ -216,5 +222,11 @@
   .suggestion {
     color: var(--ct-color-text-muted);
     font-style: italic;
+  }
+
+  .help-text {
+    font-size: var(--ct-font-size-xs);
+    color: var(--ct-color-text-muted);
+    line-height: 1.4;
   }
 </style>

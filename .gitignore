@@ -7,3 +7,5 @@ dist/
 .env.*
 !.env.example
 .claudit/
+
+.DS_Store

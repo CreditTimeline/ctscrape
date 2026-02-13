@@ -23,5 +23,5 @@ export function getFaroEnvironment(): string {
 }
 
 export function isFaroConfigured(): boolean {
-  return FARO_COLLECTOR_URL !== '';
+  return (FARO_COLLECTOR_URL as string) !== '';
 }

@@ -45,3 +45,10 @@ ul,
 ol {
   list-style: none;
 }
+
+/* Inline help / guidance text beneath form fields or section content */
+.help-text {
+  font-size: var(--ct-font-size-xs);
+  color: var(--ct-color-text-muted);
+  line-height: 1.4;
+}

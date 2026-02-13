@@ -167,6 +167,7 @@
 <main class="sidepanel">
   <header class="header">
     <h1 class="title">ctscrape</h1>
+    <a class="header-docs" href="https://credittimeline.uk/ctscrape" target="_blank" rel="noopener noreferrer">Docs</a>
   </header>
 
   <div class="sections">
@@ -233,6 +234,12 @@
 
     <DiagnosticLog />
   </div>
+
+  <footer class="footer">
+    <a href="https://credittimeline.uk/ctscrape" target="_blank" rel="noopener noreferrer">Docs</a>
+    <span class="footer-sep">&middot;</span>
+    <a href="mailto:ctscrape@credittimeline.uk">Support</a>
+  </footer>
 </main>
 
 <ToastContainer />
@@ -245,7 +252,19 @@
   }
 
   .header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     margin-bottom: var(--ct-space-4);
+  }
+
+  .header-docs {
+    font-size: var(--ct-font-size-xs);
+    color: var(--ct-color-text-muted);
+  }
+
+  .header-docs:hover {
+    color: var(--ct-color-primary);
   }
 
   .title {
@@ -262,5 +281,20 @@
   .divider {
     border: none;
     border-top: 1px solid var(--ct-color-border-subtle);
+  }
+
+  .footer {
+    margin-top: var(--ct-space-6);
+    padding-top: var(--ct-space-3);
+    border-top: 1px solid var(--ct-color-border-subtle);
+    display: flex;
+    justify-content: center;
+    gap: var(--ct-space-2);
+    font-size: var(--ct-font-size-xs);
+    color: var(--ct-color-text-muted);
+  }
+
+  .footer-sep {
+    color: var(--ct-color-border);
   }
 </style>

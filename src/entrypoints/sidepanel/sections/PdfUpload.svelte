@@ -117,7 +117,7 @@
     >
       <div class="drop-content">
         <span class="drop-icon">&#128196;</span>
-        <p class="drop-text">Drag and drop a PDF credit report here</p>
+        <p class="drop-text">Drag and drop an Equifax PDF credit report</p>
         <p class="drop-hint">or</p>
         <label class="btn btn-secondary file-label">
           Choose File
@@ -128,6 +128,9 @@
             onchange={handleFileInput}
           />
         </label>
+        <p class="help-text supported-note">
+          Only <a href="https://my.equifax.co.uk/#/products/older-credit-report" target="_blank" rel="noopener noreferrer">Equifax credit history</a> PDFs are currently supported.
+        </p>
       </div>
     </div>
 
@@ -238,6 +241,10 @@
   .drop-hint {
     font-size: var(--ct-font-size-xs);
     color: var(--ct-color-text-muted);
+  }
+
+  .supported-note {
+    margin-top: var(--ct-space-1);
   }
 
   .file-label {
