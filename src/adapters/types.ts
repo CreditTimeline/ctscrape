@@ -36,6 +36,57 @@ export interface PageInfo {
   providers: string[];
 }
 
+// ---------------------------------------------------------------------------
+// PDF Adapter interface — operates on extracted text instead of DOM
+// ---------------------------------------------------------------------------
+
+/**
+ * Interface for PDF-based adapters.
+ * Operates on text extracted from a PDF instead of a live DOM.
+ */
+export interface PdfAdapter {
+  /** Unique adapter identifier (e.g., "equifax-pdf") */
+  readonly id: string;
+
+  /** Human-readable name (e.g., "Equifax PDF") */
+  readonly name: string;
+
+  /** Adapter version (semver) */
+  readonly version: string;
+
+  /** Quick check: does this text look like a report this adapter handles? */
+  detect(textSample: string): boolean;
+
+  /** Extract report metadata (subject name, date, etc.) from full text */
+  getReportInfo(fullText: string): PdfReportInfo;
+
+  /** Full data extraction from the PDF text */
+  extract(input: PdfExtractionInput): Promise<RawExtractedData>;
+
+  /** Which ctspec data domains does this adapter cover? */
+  getSupportedSections(): DataDomain[];
+}
+
+/** Report-level info extracted from a PDF before full extraction */
+export interface PdfReportInfo {
+  subjectName: string;
+  reportDate: string;
+  reference?: string;
+  pageCount: number;
+}
+
+/** Input to a PdfAdapter.extract() call */
+export interface PdfExtractionInput {
+  fullText: string;
+  pages: string[];
+  pageCount: number;
+  filename: string;
+}
+
+// ---------------------------------------------------------------------------
+// Data domains
+// ---------------------------------------------------------------------------
+
 /** ctspec data domains that an adapter can extract */
 export type DataDomain =
   | 'personal_info'
@@ -64,6 +115,10 @@ export interface ExtractionMetadata {
   htmlHash: string;
   /** Which CRA source systems were found (for multi-CRA sites like CheckMyFile) */
   sourceSystemsFound: string[];
+  /** Whether this was extracted from HTML or PDF */
+  artifactType?: 'html' | 'pdf';
+  /** Original filename for PDF uploads */
+  sourceFilename?: string;
 }
 
 /**

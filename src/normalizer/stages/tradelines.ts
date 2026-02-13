@@ -21,8 +21,16 @@ import { generateId, generateSequentialId } from '../id-generator';
 import { groupFieldsByGroupKey } from '../field-grouper';
 import { mapAccountType } from '../mappers/account-type';
 import { mapAccountStatus } from '../mappers/account-status';
-import { mapCheckMyFilePaymentStatus } from '../mappers/payment-status';
-import { parseLongDate, parseAmount } from '@/utils/parsers';
+import { mapCheckMyFilePaymentStatus, mapCraPaymentCode } from '../mappers/payment-status';
+import { parseLongDate, parseSlashDate, parseAmount } from '@/utils/parsers';
+
+// ---------------------------------------------------------------------------
+// Flexible date parser — tries long-form first, then slash format
+// ---------------------------------------------------------------------------
+
+function parseDate(text: string): string | null {
+  return parseLongDate(text) ?? parseSlashDate(text);
+}
 
 // ---------------------------------------------------------------------------
 // Heading parser
@@ -87,6 +95,7 @@ function detectEvents(
   openedAt: string | undefined,
   importId: string,
   ctx: NormalisationContext,
+  defaultDate?: string,
 ): TradelineEvent[] {
   const events: TradelineEvent[] = [];
   if (!statusCurrent) return events;
@@ -97,7 +106,7 @@ function detectEvents(
     events.push({
       event_id: generateSequentialId('evt', nextCounter(ctx, 'evt')),
       event_type: 'default' as TradelineEventType,
-      event_date: closedAt ?? openedAt ?? new Date().toISOString().split('T')[0]!,
+      event_date: defaultDate ?? closedAt ?? openedAt ?? new Date().toISOString().split('T')[0]!,
       source_import_id: importId,
     });
   }
@@ -154,10 +163,21 @@ export function buildTradelines(
 
     // --- Dates ---
     const openedField = group.fields.get('opened');
-    const openedAt = openedField ? parseLongDate(openedField.value) : undefined;
+    const openedAt = openedField ? parseDate(openedField.value) : undefined;
 
     const closedField = group.fields.get('closed');
-    const closedAt = closedField ? parseLongDate(closedField.value) : undefined;
+    let closedAt = closedField ? parseDate(closedField.value) : undefined;
+
+    // Fallback: use date_satisfied as closedAt
+    if (!closedAt) {
+      const dateSatisfiedField = group.fields.get('date_satisfied');
+      if (dateSatisfiedField) {
+        closedAt = parseDate(dateSatisfiedField.value) ?? undefined;
+      }
+    }
+
+    // is_closed hint
+    const isClosedField = group.fields.get('is_closed');
 
     // --- Status ---
     const statusField = group.fields.get('status');
@@ -166,6 +186,11 @@ export function buildTradelines(
       const { canonicalStatus, warning: statusWarning } = mapAccountStatus(statusField.value, sourceSystem);
       statusCurrent = canonicalStatus;
       if (statusWarning) ctx.warnings.push(statusWarning);
+    }
+
+    // Use is_closed hint to infer settled status when no explicit status
+    if (!statusCurrent && isClosedField?.value === 'true') {
+      statusCurrent = 'settled';
     }
 
     // --- Last 4 (identifier) ---
@@ -212,7 +237,14 @@ export function buildTradelines(
     const openingBalance = openingBalanceField ? parseAmount(openingBalanceField.value) : undefined;
     const currentBalance = balanceField ? parseAmount(balanceField.value) : undefined;
     const creditLimit = limitField ? parseAmount(limitField.value) : undefined;
-    const asOfDate = reportedUntilField ? parseLongDate(reportedUntilField.value) : undefined;
+
+    let asOfDate = reportedUntilField ? parseDate(reportedUntilField.value) : undefined;
+    if (!asOfDate) {
+      const dateUpdatedField = group.fields.get('date_updated');
+      if (dateUpdatedField) {
+        asOfDate = parseDate(dateUpdatedField.value) ?? undefined;
+      }
+    }
 
     const snapshots: TradelineSnapshot[] = [];
     if (openingBalance != null || currentBalance != null || creditLimit != null || asOfDate) {
@@ -228,13 +260,17 @@ export function buildTradelines(
     }
 
     // --- Monthly metrics (payment history) ---
+    // Use CRA payment codes only for direct Equifax PDF adapter; CheckMyFile uses descriptive text
+    const usesCraPaymentCodes = ctx.metadata.adapterId === 'equifax-pdf';
     const metrics: TradelineMonthlyMetric[] = [];
     for (const [fieldName, field] of group.fields) {
       const match = fieldName.match(paymentHistoryRe);
       if (!match) continue;
 
       const period = `${match[1]}-${match[2]}`;
-      const { canonicalStatus, warning: phWarning } = mapCheckMyFilePaymentStatus(field.value);
+      const { canonicalStatus, warning: phWarning } = usesCraPaymentCodes
+        ? mapCraPaymentCode(field.value, 'equifax')
+        : mapCheckMyFilePaymentStatus(field.value);
       if (phWarning) ctx.warnings.push(phWarning);
 
       metrics.push({
@@ -247,8 +283,21 @@ export function buildTradelines(
       });
     }
 
+    // --- Account number identifier ---
+    const accountNumberField = group.fields.get('account_number');
+    if (accountNumberField) {
+      identifiers.push({
+        identifier_id: generateSequentialId('tid', nextCounter(ctx, 'tid')),
+        identifier_type: 'masked_account_number',
+        value: accountNumberField.value,
+        source_import_id: importId,
+      });
+    }
+
     // --- Events ---
-    const events = detectEvents(statusCurrent, closedAt ?? undefined, openedAt ?? undefined, importId, ctx);
+    const defaultDateField = group.fields.get('default_date');
+    const defaultDate = defaultDateField ? parseDate(defaultDateField.value) ?? undefined : undefined;
+    const events = detectEvents(statusCurrent, closedAt ?? undefined, openedAt ?? undefined, importId, ctx, defaultDate);
 
     // --- Canonical ID ---
     const canonicalId = generateId(

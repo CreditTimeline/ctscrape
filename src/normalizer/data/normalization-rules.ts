@@ -126,6 +126,8 @@ export const SEARCH_TYPE_MAP: Record<
     'debt collection': { search_type: 'debt_collection', visibility: 'hard' },
     'consumer enquiry': { search_type: 'consumer_enquiry', visibility: 'soft' },
     'id check to comply with ml regs': { search_type: 'identity_check', visibility: 'soft' },
+    'credit quotation': { search_type: 'quotation', visibility: 'soft' },
+    'identity verification': { search_type: 'identity_check', visibility: 'soft' },
     'n/a': { search_type: 'other', visibility: 'unknown' },
   },
   transunion: {

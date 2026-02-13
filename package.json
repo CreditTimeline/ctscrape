@@ -24,6 +24,7 @@
   "dependencies": {
     "@grafana/faro-web-sdk": "^2.2.3",
     "@webext-core/messaging": "^1.4.0",
+    "pdfjs-dist": "^5.4.624",
     "svelte": "^5.0.0"
   },
   "devDependencies": {

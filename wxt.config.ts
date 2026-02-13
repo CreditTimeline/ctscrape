@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'ctscrape — Credit Report Scraper',
     description: 'Scrape credit report data and send it to ctview for storage and analysis',
     permissions: ['storage', 'activeTab', 'sidePanel', 'alarms'],
-    host_permissions: ['*://*.checkmyfile.com/*'],
+    host_permissions: ['*://*.checkmyfile.com/*', '*://*.equifax.co.uk/*'],
     optional_host_permissions: ['*://*/*'],
     icons: {
       16: 'icon/icon-16.png',
@@ -51,6 +51,12 @@ export default defineConfig({
         __GA4_API_SECRET__: JSON.stringify(process.env.GA4_API_SECRET ?? ''),
       },
       plugins,
+      resolve: {
+        alias: {
+          // Use the pre-built ES module (no worker dependency)
+          'pdfjs-dist': 'pdfjs-dist/build/pdf.mjs',
+        },
+      },
       build: {
         sourcemap: !!faroApiKey,
       },

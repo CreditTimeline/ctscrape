@@ -15,15 +15,22 @@ export type ExtractionState =
   | 'complete'
   | 'error';
 
-/** Tracks the state of an extraction job for a single tab */
+/** Tracks the state of an extraction job for a single tab or PDF upload */
 export interface ExtractionJob {
-  tabId: number;
+  /** Tab ID for DOM-based jobs, null for PDF uploads */
+  tabId: number | null;
+  /** Unique job ID (used for PDF jobs that don't have a tab) */
+  jobId?: string;
+  /** Whether this job is from DOM scraping or PDF upload */
+  source: 'dom' | 'pdf';
   state: ExtractionState;
   adapterId: string;
   pageInfo: PageInfo | null;
   rawData: RawExtractedData | null;
   normalisationResult: NormalisationResult | null;
   htmlArtifact: HtmlArtifact | null;
+  /** PDF-specific artifact info */
+  pdfArtifact?: PdfArtifact;
   error: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -34,6 +41,14 @@ export interface HtmlArtifact {
   hash: string;
   capturedAt: string;
   pageUrl: string;
+}
+
+/** PDF-specific provenance artifact */
+export interface PdfArtifact {
+  hash: string;
+  filename: string;
+  pageCount: number;
+  extractedAt: string;
 }
 
 /** Valid state transitions for the extraction state machine */

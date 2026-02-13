@@ -3,10 +3,13 @@ import { nextCounter, getImportId, registerOrganisation, registerAddress } from 
 import { generateId, generateSequentialId } from '../id-generator';
 import { groupFieldsByGroupKey } from '../field-grouper';
 import { mapCheckMyFileSearchType } from '../mappers/search-type';
+import { SEARCH_TYPE_MAP } from '../data/normalization-rules';
 import { parseUkAddress } from '../mappers/address-parser';
 import { parseSlashDate } from '@/utils/parsers';
 import type { RawSection } from '@/adapters/types';
 import type { Address } from '../credit-file.types';
+import type { SearchType, SearchVisibility } from '../data/enums';
+import type { NormalisationWarning } from '../types';
 
 export function normaliseSearches(ctx: NormalisationContext, sections: RawSection[]): void {
   const groups = groupFieldsByGroupKey(sections, 'searches');
@@ -14,10 +17,29 @@ export function normaliseSearches(ctx: NormalisationContext, sections: RawSectio
   for (const [groupKey, group] of groups) {
     const importId = getImportId(ctx, group.sourceSystem);
 
-    // Determine hard/soft from groupKey
-    const isHard = groupKey.toLowerCase().includes('hard');
-    const sectionType: 'hard' | 'soft' = isHard ? 'hard' : 'soft';
-    const { searchType, visibility, warning } = mapCheckMyFileSearchType(sectionType);
+    // Determine search type — prefer explicit search_purpose field, fall back to section inference
+    const searchPurposeField = group.fields.get('search_purpose');
+    let searchType: SearchType;
+    let visibility: SearchVisibility;
+    let warning: NormalisationWarning | undefined;
+
+    if (searchPurposeField) {
+      const mapped = SEARCH_TYPE_MAP.equifax?.[searchPurposeField.value.toLowerCase()];
+      if (mapped) {
+        searchType = mapped.search_type;
+        visibility = mapped.visibility;
+        warning = undefined;
+      } else {
+        // Fall back to section-based inference
+        const isHard = groupKey.toLowerCase().includes('hard');
+        const sectionType: 'hard' | 'soft' = isHard ? 'hard' : 'soft';
+        ({ searchType, visibility, warning } = mapCheckMyFileSearchType(sectionType));
+      }
+    } else {
+      const isHard = groupKey.toLowerCase().includes('hard');
+      const sectionType: 'hard' | 'soft' = isHard ? 'hard' : 'soft';
+      ({ searchType, visibility, warning } = mapCheckMyFileSearchType(sectionType));
+    }
     if (warning) ctx.warnings.push(warning);
 
     // Parse date

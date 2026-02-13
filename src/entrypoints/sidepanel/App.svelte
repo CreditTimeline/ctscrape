@@ -14,8 +14,11 @@
   import ToastContainer from '../../components/ToastContainer.svelte';
   import { initFaro, teardownFaro } from '../../lib/telemetry/faro-init';
 
+  import type { PdfReportInfo } from '../../adapters/types';
+
   import ConnectionSettingsSection from './sections/ConnectionSettings.svelte';
   import CurrentPage from './sections/CurrentPage.svelte';
+  import PdfUpload from './sections/PdfUpload.svelte';
   import ExtractionResults from './sections/ExtractionResults.svelte';
   import SendToCtview from './sections/SendToCtview.svelte';
   import History from './sections/History.svelte';
@@ -28,6 +31,8 @@
   let prefs = $state<UserPreferences>({ defaultSubjectId: '', autoExtract: false, theme: 'system', debugLogging: false, analyticsConsent: false });
   let history = $state<ScrapeHistoryEntry[]>([]);
   let lastSendResult = $state<SendResult | null>(null);
+  let pdfJobId = $state<string | null>(null);
+  let pdfJobStatus = $state<ExtensionStatus>({ state: 'idle' });
 
   // Start/stop status polling
   $effect(() => {
@@ -69,6 +74,21 @@
     if (poller.status.state === 'idle' || poller.status.state === 'detected') {
       lastSendResult = null;
     }
+  });
+
+  // Poll PDF job status when a PDF job is active
+  $effect(() => {
+    if (!pdfJobId) return;
+    const id = pdfJobId;
+
+    // Initial fetch
+    sendMessage('getPdfJobStatus', { jobId: id }).then((s) => (pdfJobStatus = s)).catch(() => {});
+
+    const timer = setInterval(() => {
+      sendMessage('getPdfJobStatus', { jobId: id }).then((s) => (pdfJobStatus = s)).catch(() => {});
+    }, 1000);
+
+    return () => clearInterval(timer);
   });
 
   async function handleSaveConnection(settings: ConnectionSettings) {
@@ -117,6 +137,25 @@
     addToast('History cleared.', 'success');
   }
 
+  function handlePdfJobReady(jobId: string, _reportInfo: PdfReportInfo) {
+    pdfJobId = jobId;
+    lastSendResult = null;
+  }
+
+  async function handlePdfSend() {
+    if (!pdfJobId) return;
+    try {
+      lastSendResult = null;
+      const result = await sendMessage('sendPdfJobToCtview', { jobId: pdfJobId });
+      lastSendResult = result;
+      if (!result.success) {
+        addToast(result.error ?? 'Send failed', 'error');
+      }
+    } catch (e) {
+      addToast('Send failed: ' + (e instanceof Error ? e.message : 'Unknown error'), 'error');
+    }
+  }
+
   async function handleSavePreferences(newPrefs: UserPreferences) {
     await userPreferences.setValue(newPrefs);
     prefs = newPrefs;
@@ -154,6 +193,26 @@
         serverUrl={connSettings.serverUrl}
         sendResult={lastSendResult}
         onsend={handleSend}
+      />
+    {/if}
+
+    <hr class="divider" />
+
+    <PdfUpload onjobready={handlePdfJobReady} />
+
+    {#if pdfJobId && pdfJobStatus.result}
+      <hr class="divider" />
+
+      <ExtractionResults result={pdfJobStatus.result} />
+
+      <hr class="divider" />
+
+      <SendToCtview
+        result={pdfJobStatus.result}
+        extractionState={pdfJobStatus.state}
+        serverUrl={connSettings.serverUrl}
+        sendResult={lastSendResult}
+        onsend={handlePdfSend}
       />
     {/if}
 

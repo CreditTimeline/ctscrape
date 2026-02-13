@@ -80,12 +80,13 @@ AD-008: Local Storage Strategy
 
 AD-009: Provenance & Artifact Tracking
   - Every scrape produces a RawArtifact entry with:
-    - SHA-256 hash of the original HTML
+    - SHA-256 hash of the original HTML or PDF bytes
     - Timestamp of extraction
-    - URL of the source page
+    - URL of the source page (or empty for PDF uploads)
     - Adapter version used
-  - acquisition_method is always "html_scrape" for browser extension data
-  - source_wrapper records the site name (e.g., "CheckMyFile")
+  - acquisition_method is "html_scrape" for DOM-based or "pdf_upload" for PDF-based
+  - artifact_type is "html" or "pdf" accordingly
+  - source_wrapper records the site name (e.g., "CheckMyFile", "Equifax")
 
 AD-010: Validation Before Send
   - Extracted data is validated against ctspec JSON schema before sending
@@ -102,12 +103,25 @@ FUTURE: ADDITIONAL ADAPTERS
 Each adapter follows the same pattern established by the CheckMyFile adapter.
 These are listed in priority order based on UK market coverage.
 
-ClearScore (TransUnion data):
+ClearScore (Equifax data):
   - [ ] Research ClearScore page structure
   - [ ] Implement ClearScore adapter (src/adapters/clearscore/)
   - [ ] Section extractors for ClearScore-specific layout
   - [ ] Test fixtures and unit tests
   - [ ] Integration test: ClearScore HTML → valid CreditFile
+
+Equifax (PDF-based adapter — COMPLETED):
+  - [x] PDF infrastructure: pdfjs-dist integration, text extraction, SHA-256 hashing
+  - [x] PdfAdapter interface and PDF adapter registry (parallel to DOM SiteAdapter)
+  - [x] Equifax PDF parser: section splitter, line utilities, 10 section parsers
+  - [x] Payment history grid parser for complex pdftotext column-by-column format
+  - [x] Credit agreements parser (open/closed, categories, payment history delegation)
+  - [x] Searches parser (hard/soft, company names, search purposes)
+  - [x] Normaliser adaptations: import-batches, tradelines, searches, normalization-rules
+  - [x] Orchestrator + messaging: PDF job lifecycle, processPdf/getPdfJobStatus handlers
+  - [x] Sidepanel PDF upload UI (drag-and-drop, detection, extraction, send flow)
+  - [x] Equifax content script (UX hint on older-reports page)
+  - [x] Build verification: pnpm check + pnpm build + pnpm test:run all pass
 
 Credit Karma (TransUnion data):
   - [ ] Research Credit Karma UK page structure
@@ -184,4 +198,8 @@ CLAUDE SHOULD IGNORE BELOW THIS LINE!
   4. Local .env.local — For dev testing: GA4_MEASUREMENT_ID=G-xxx and GA4_API_SECRET=xxx
 
 prompt text (already at start of instruction)
-Consume todos.txt and follow all instructions within it. We are now ready to plan out and implement Phase 5. Please make a comprehensive implementation plan for all tasks listed within the phase, ensuring we are comforming with all defined ADRs in todos.txt. Make use of subagents and agent teams where appropriate during the planning and implementation phases once the plan is approved. Ensure the todos.txt file is updated to mark each phase as complete once it is completed and ensure this initial prompt is included on any plan produced so it is not lost during context compaction.
+Consume todos.txt and follow all instructions within it. We are now ready to plan out and implement the Equifax section. Please make a comprehensive implementation plan for all tasks listed within the phase, ensuring we are comforming with all defined ADRs in todos.txt. Make use of subagents and agent teams where appropriate during the planning and implementation phases once the plan is approved. Ensure the todos.txt file is updated to mark each phase as complete once it is completed and ensure this initial prompt is included on any plan produced so it is not lost during context compaction.
+Use the claude chrome mcp to analyse the site. 
+However, I should note that I only have a free membership to the equifax service. 
+One interesting about the equifax service is they have an 'older reports' section which updates every time someones report is updated after they log in. The URL is https://my.equifax.co.uk/#/products/older-credit-report and each report has a download report button which downloads a PDF. I have the pdf available at /Users/rob/Downloads/efx-creditreport-13022026.pdf
+I am wondering given the PDF report is very comprehensive and contains all historical data in the users report in a rather machine readable way if for this type of report (and potentially other sites in the future that offer an export functionality) we get the PDF in our extension and then process that. These PDFs have the same data for free equifax users as well as paid so it is likely the best source and it'd be worthwhile if we can explore using that and what the best user flow is (such as instruct them to download the report first then upload it to our extension or if the extension can catch the PDF directly and process it that way).

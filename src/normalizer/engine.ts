@@ -21,8 +21,14 @@ import { validateReferentialIntegrity } from './validation/referential-integrity
 export function normalise(input: NormaliserInput): NormalisationResult {
   const { rawData, config } = input;
 
+  const ADAPTER_SITE_NAMES: Record<string, string> = {
+    'checkmyfile': 'CheckMyFile',
+    'equifax-pdf': 'Equifax',
+  };
+  const siteName = ADAPTER_SITE_NAMES[rawData.metadata.adapterId] ?? rawData.metadata.adapterId;
+
   const pageInfo: PageInfo = input.pageInfo ?? {
-    siteName: 'CheckMyFile',
+    siteName,
     subjectName: extractSubjectName(rawData),
     reportDate: extractReportDate(rawData),
     providers: rawData.metadata.sourceSystemsFound,

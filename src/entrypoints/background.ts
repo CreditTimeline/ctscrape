@@ -1,4 +1,4 @@
-import { onMessage, sendMessage, type SendResult } from '@/utils/messaging';
+import { onMessage, sendMessage, type SendResult, type PdfProcessResult } from '@/utils/messaging';
 import { scrapeHistory, connectionSettings, type ScrapeHistoryEntry } from '@/utils/storage';
 import * as orchestrator from '@/extraction/orchestrator';
 import { normalise } from '@/normalizer/engine';
@@ -10,6 +10,11 @@ import { sendGA4Event } from '@/lib/analytics/ga4';
 import * as ga4Events from '@/lib/analytics/events';
 import { startCollector, pushError, pushEvent, pushMeasurement } from '@/lib/telemetry/collector';
 import { exportSupportBundle } from '@/lib/logger/support-bundle';
+import { extractTextFromPdf, sha256Buffer } from '@/lib/pdf';
+import { detectPdfAdapter } from '@/adapters/pdf-registry';
+
+// Register PDF adapters — side-effect imports
+import '@/adapters/equifax-pdf';
 
 export default defineBackground(() => {
   const logger = createLogger('background');
@@ -363,6 +368,184 @@ export default defineBackground(() => {
 
   onMessage('trackEvent', ({ data }) => {
     sendGA4Event(data.eventName, data.params).catch(() => {});
+  });
+
+  // --- PDF processing handlers ---
+
+  onMessage('processPdf', async ({ data }): Promise<PdfProcessResult> => {
+    try {
+      // Decode Base64 to ArrayBuffer
+      const binaryString = atob(data.pdfBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const pdfBuffer = bytes.buffer;
+
+      // Extract text from PDF
+      const textResult = await extractTextFromPdf(pdfBuffer);
+      logger.info('PDF text extracted', { category: 'extraction', data: { pageCount: textResult.pageCount, textLength: textResult.fullText.length } });
+
+      // Compute SHA-256 hash for provenance
+      const pdfHash = await sha256Buffer(pdfBuffer);
+
+      // Auto-detect adapter from first 2000 chars of text
+      const adapter = detectPdfAdapter(textResult.fullText.substring(0, 2000));
+      if (!adapter) {
+        return { detected: false, error: 'Unrecognised PDF format. This does not appear to be a supported credit report.' };
+      }
+
+      // Get report info
+      const reportInfo = adapter.getReportInfo(textResult.fullText);
+      reportInfo.pageCount = textResult.pageCount;
+
+      // Create job
+      const jobId = `pdf-${Date.now()}`;
+      const job = orchestrator.createPdfJob(jobId, adapter.id);
+      job.pageInfo = {
+        siteName: adapter.name,
+        subjectName: reportInfo.subjectName,
+        reportDate: reportInfo.reportDate,
+        providers: ['Equifax'],
+      };
+
+      logger.info('PDF adapter detected', { category: 'extraction', data: { adapterId: adapter.id, jobId, reportInfo } });
+
+      // Run extraction
+      orchestrator.onPdfExtractionStarted(jobId);
+      const rawData = await adapter.extract({
+        fullText: textResult.fullText,
+        pages: textResult.pages,
+        pageCount: textResult.pageCount,
+        filename: data.filename,
+      });
+
+      // Set the hash from the PDF bytes
+      rawData.metadata.htmlHash = pdfHash;
+
+      orchestrator.onPdfExtractionComplete(jobId, rawData, {
+        hash: pdfHash,
+        filename: data.filename,
+        pageCount: textResult.pageCount,
+        extractedAt: rawData.metadata.extractedAt,
+      });
+
+      // Normalise
+      const normStart = Date.now();
+      const result = normalise({
+        rawData,
+        config: {
+          defaultSubjectId: 'subject:default',
+          currencyCode: 'GBP',
+        },
+        pageInfo: job.pageInfo,
+      });
+      const normDuration = Date.now() - normStart;
+
+      orchestrator.onPdfNormalisationComplete(jobId, result);
+
+      logger.info('PDF normalisation complete', {
+        category: 'normalisation',
+        data: { jobId, success: result.success, errors: result.errors.length, warnings: result.warnings.length, summary: result.summary },
+      });
+
+      // Track analytics
+      const totalEntities = Object.values(result.summary).reduce((sum, v) => sum + (v as number), 0);
+      const extractEvt = ga4Events.extractionCompleted(adapter.id, totalEntities);
+      sendGA4Event(extractEvt.name, extractEvt.params).catch(() => {});
+      pushMeasurement('normalisation', { duration_ms: normDuration }, { adapter_id: adapter.id });
+
+      // Write history entry
+      scrapeHistory.getValue().then((history) => {
+        const entry: ScrapeHistoryEntry = {
+          id: `${Date.now()}-pdf-${jobId}`,
+          adapterId: adapter.id,
+          siteName: adapter.name,
+          extractedAt: rawData.metadata.extractedAt,
+          sentAt: null,
+          status: 'pending',
+          entityCounts: Object.fromEntries(
+            Object.entries(result.summary).filter(([, v]) => (v as number) > 0),
+          ),
+          receiptId: null,
+          error: result.success ? null : result.errors.map((e) => e.message).join('; '),
+        };
+        return scrapeHistory.setValue([entry, ...history].slice(0, 50));
+      }).catch((err) => logger.error('history write failed', { category: 'storage', error: err }));
+
+      return { detected: true, jobId, adapterId: adapter.id, reportInfo };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.error('PDF processing failed', { category: 'extraction', data: { error: message } });
+      pushError(err instanceof Error ? err : new Error(message), { context: 'pdf_processing' });
+      return { detected: false, error: `PDF processing failed: ${message}` };
+    }
+  });
+
+  onMessage('getPdfJobStatus', async ({ data }) => {
+    return orchestrator.getStatusForJob(data.jobId);
+  });
+
+  onMessage('sendPdfJobToCtview', async ({ data }): Promise<SendResult> => {
+    const job = orchestrator.getJobById(data.jobId);
+    if (!job || !job.normalisationResult?.creditFile) {
+      return { success: false, error: 'No normalised PDF data available to send', errorCode: 'NO_DATA' };
+    }
+
+    const client = await getClient();
+    if (!client) {
+      return {
+        success: false,
+        error: 'ctview server is not configured',
+        errorCode: 'NOT_CONFIGURED',
+        suggestion: 'Enter a server URL and API key in Connection Settings.',
+      };
+    }
+
+    try {
+      orchestrator.onPdfSendStarted(data.jobId);
+
+      const sendStart = Date.now();
+      const result = await client.ingest(job.normalisationResult.creditFile);
+      const sendDuration = Date.now() - sendStart;
+
+      orchestrator.onPdfSendComplete(data.jobId);
+
+      await updateHistoryEntry(job.adapterId, job.rawData?.metadata.extractedAt ?? '', {
+        status: 'sent',
+        sentAt: new Date().toISOString(),
+        receiptId: result.receiptId ?? null,
+        error: null,
+      });
+
+      logger.info('PDF data sent to ctview', { category: 'api', data: { jobId: data.jobId, receiptId: result.receiptId } });
+      pushMeasurement('ctview_send', { duration_ms: sendDuration });
+
+      return {
+        success: true,
+        receiptId: result.receiptId,
+        importIds: result.importIds,
+        summary: result.summary,
+        duplicate: result.duplicate,
+      };
+    } catch (err) {
+      const classified = classifySendError(err);
+      orchestrator.onPdfSendError(data.jobId, classified.error);
+      logger.error('PDF send to ctview failed', { category: 'api', data: { errorCode: classified.errorCode, error: classified.error } });
+
+      await updateHistoryEntry(job.adapterId, job.rawData?.metadata.extractedAt ?? '', {
+        status: 'failed',
+        error: classified.error,
+      });
+
+      return {
+        success: false,
+        error: classified.error,
+        errorCode: classified.errorCode,
+        suggestion: classified.suggestion,
+        duplicate: classified.duplicate,
+      };
+    }
   });
 
   // --- Telemetry event forwarding (from content scripts) ---

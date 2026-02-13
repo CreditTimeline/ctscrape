@@ -1,8 +1,17 @@
 import { defineExtensionMessaging } from '@webext-core/messaging';
-import type { PageInfo, RawExtractedData } from '../adapters/types';
+import type { PageInfo, PdfReportInfo, RawExtractedData } from '../adapters/types';
 import type { NormalisationResult } from '../normalizer/types';
 import type { ConnectionTestResult } from '../lib/ctview-client';
 import type { LogEntry, LogFilter, LogExportBundle, SupportBundle } from '../lib/logger/types';
+
+/** Result of processing a PDF upload */
+export interface PdfProcessResult {
+  detected: boolean;
+  jobId?: string;
+  adapterId?: string;
+  reportInfo?: PdfReportInfo;
+  error?: string;
+}
 
 /** Result of a sendToCtview operation. */
 export interface SendResult {
@@ -81,6 +90,17 @@ interface ProtocolMap {
     type: 'error' | 'log' | 'event' | 'measurement';
     payload: Record<string, unknown>;
   }): void;
+
+  // --- PDF processing messages ---
+
+  /** Sidepanel sends a PDF for processing (Base64-encoded) */
+  processPdf(data: { pdfBase64: string; filename: string }): PdfProcessResult;
+
+  /** Sidepanel queries a PDF job's status */
+  getPdfJobStatus(data: { jobId: string }): ExtensionStatus;
+
+  /** Sidepanel requests sending a PDF job to ctview */
+  sendPdfJobToCtview(data: { jobId: string }): SendResult;
 }
 
 /** Current state of the extension, returned by getStatus */
