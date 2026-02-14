@@ -18,6 +18,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "screenshots": "pnpm build && vitest run --config screenshots/vitest.screenshots.config.ts",
     "check-build": "node scripts/check-build.mjs",
     "audit:deps": "pnpm audit --audit-level=high",
     "postinstall": "wxt prepare"
