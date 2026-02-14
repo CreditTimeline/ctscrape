@@ -40,6 +40,7 @@ jobs:
         with:
           name: release-zip
           path: .output/*.zip
+          include-hidden-files: true
 
   chrome-web-store:
     name: Chrome Web Store Submission

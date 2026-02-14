@@ -62,6 +62,7 @@ jobs:
           path: .output/
           retention-days: 14
           if-no-files-found: error
+          include-hidden-files: true
 
   security-tests:
     name: Security Tests
