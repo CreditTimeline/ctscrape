@@ -24,6 +24,7 @@ export async function launchBrowserWithExtension(): Promise<Browser> {
       '--no-first-run',
       '--disable-default-apps',
       '--disable-gpu',
+      ...(process.env.CI ? ['--no-sandbox'] : []),
     ],
   });
 }
