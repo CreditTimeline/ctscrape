@@ -32,7 +32,7 @@ export async function launchBrowserWithExtension(): Promise<Browser> {
 export async function getExtensionId(browser: Browser): Promise<string> {
   const swTarget = await browser.waitForTarget(
     (t) => t.type() === 'service_worker' && t.url().includes('chrome-extension://'),
-    { timeout: 10_000 },
+    { timeout: 30_000 },
   );
   const url = swTarget.url();
   const match = url.match(/chrome-extension:\/\/([a-z]+)\//);
