@@ -7,16 +7,14 @@ const EXTENSION_PATH = resolve(__dirname, '../../.output/chrome-mv3');
 /**
  * Launch Chrome with the built extension loaded.
  *
- * MV3 extensions do NOT work in old headless mode. They require either:
- * - headed mode (headless: false) — needs a display (or xvfb in CI)
- * - new headless mode (headless: 'shell') — but this doesn't support extensions
- *
- * Default is headless: false. In CI, wrap with xvfb-run or similar.
- * Set CHROME_PATH to override the Chrome binary location.
+ * Uses the default headless mode (full Chrome, not chrome-headless-shell)
+ * which supports MV3 extensions since Puppeteer v22+.
+ * Set HEADLESS=false to run headed (useful for local debugging).
  */
 export async function launchBrowserWithExtension(): Promise<Browser> {
   return puppeteer.launch({
-    headless: false,
+    headless: process.env.HEADLESS === 'false' ? false : true,
+    pipe: true,
     executablePath: process.env.CHROME_PATH,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
