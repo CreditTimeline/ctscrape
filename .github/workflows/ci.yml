@@ -61,6 +61,7 @@ jobs:
           name: build-output
           path: .output/
           retention-days: 14
+          if-no-files-found: error
 
   security-tests:
     name: Security Tests
@@ -69,7 +70,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: build-output
           path: .output/
@@ -80,3 +80,26 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:run -- src/__tests__/security/
+
+  e2e:
+    name: E2E Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-output
+          path: .output/
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chrome for Puppeteer
+        run: npx puppeteer browsers install chrome
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Run E2E tests
+        run: xvfb-run --auto-servernum pnpm vitest run --config e2e/vitest.e2e.config.ts

@@ -4,11 +4,13 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
-  publish:
-    name: Chrome Web Store Submission
+  build-release:
+    name: Build & Upload Release Asset
     runs-on: ubuntu-latest
-    environment: chrome-web-store
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -28,7 +30,34 @@ jobs:
           FARO_SOURCE_MAP_ENDPOINT: ${{ secrets.FARO_SOURCE_MAP_ENDPOINT }}
       - run: pnpm zip
       - run: pnpm check-build
+      - name: Upload ZIP as release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ZIP_FILE=$(ls .output/*.zip | head -1)
+          gh release upload "${{ github.event.release.tag_name }}" "$ZIP_FILE" --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-zip
+          path: .output/*.zip
 
+  chrome-web-store:
+    name: Chrome Web Store Submission
+    needs: build-release
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-zip
+          path: .output/
       - name: Submit to Chrome Web Store
         run: pnpm wxt submit --chrome
         env:
@@ -36,10 +65,3 @@ jobs:
           CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
           CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
-
-      - name: Upload ZIP as release asset
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ZIP_FILE=$(ls .output/*.zip | head -1)
-          gh release upload "${{ github.event.release.tag_name }}" "$ZIP_FILE" --clobber
