@@ -1,0 +1,27 @@
+[project]
+site_name = "ctscrape Documentation"
+site_description = "Browser extension that scrapes credit report data from provider portals."
+site_url = "https://credittimeline.uk/ctscrape/"
+repo_name = "CreditTimeline/ctscrape"
+repo_url = "https://github.com/CreditTimeline/ctscrape"
+docs_dir = "docs"
+site_dir = "site"
+nav = [
+  { "Home" = "index.md" },
+  { "User Guide" = "user-guide.md" },
+  { "Architecture" = "architecture.md" },
+  { "Chrome Web Store" = "chrome-web-store.md" },
+  { "GA4 Setup" = "ga4-setup.md" },
+]
+
+[project.theme]
+name = "material"
+logo = "assets/logo.png"
+favicon = "assets/icon.png"
+
+[project.theme.palette]
+primary = "teal"
+accent = "cyan"
+
+[[project.plugins]]
+sitemap = { changefreq = "daily", priority = 0.6 }

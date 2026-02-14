@@ -10,3 +10,4 @@ dist/
 coverage/
 screenshots/output/*.png
 .DS_Store
+site/

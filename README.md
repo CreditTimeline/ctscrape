@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/logo.png" alt="CreditTimeline" width="300">
+</p>
+
 # ctscrape
 
 Browser extension that scrapes credit report data from provider websites, normalises it to the [ctspec](https://github.com/robinmount/ctspec) CreditTimeline JSON schema, and sends it to a self-hosted [ctview](https://github.com/robinmount/ctview) instance for storage and analysis.
